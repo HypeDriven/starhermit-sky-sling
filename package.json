@@ -1,0 +1,16 @@
+{
+  "name": "sky-sling",
+  "version": "1.0.0",
+  "description": "Sky Sling — breezy island slingshot physics puzzle (browser game)",
+  "main": "server.js",
+  "scripts": {
+    "test": "node test.js",
+    "start": "node server.js"
+  },
+  "keywords": ["game", "physics", "puzzle", "slingshot"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.185.0"
+  }
+}

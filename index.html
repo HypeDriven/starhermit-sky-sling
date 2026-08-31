@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="description" content="Sky Sling — a breezy island slingshot physics puzzle." />
+<title>Sky Sling</title>
+<link rel="stylesheet" href="./style.css" />
+<script src="./rules.js"></script>
+<script src="./content.js"></script>
+<script src="./audio.js"></script>
+<script src="./session.js"></script>
+<script src="./render.js"></script>
+<script src="./ui.js"></script>
+<script type="module">
+  import * as THREE from './three.min.js';
+  window.THREE = THREE;
+  window.dispatchEvent(new Event('three-ready'));
+</script>
+</head>
+<body>
+<a class="skip-link" href="#hud-objective">Skip to objective</a>
+<div id="app">
+
+  <!-- Playfield: Three.js canvas + DOM HUD (canvas is never the only UI) -->
+  <main id="game-region" aria-label="Sky Sling playfield">
+    <canvas id="gl-canvas" aria-hidden="true"></canvas>
+
+    <header id="top-bar" role="banner">
+      <button id="btn-menu" type="button" aria-label="Open menu">&#9776;</button>
+      <h1 id="hud-title">Sky Sling</h1>
+      <div class="spacer"></div>
+      <div id="hud-mode" aria-label="Current mode"></div>
+      <button id="btn-help" type="button" aria-label="Help">?</button>
+    </header>
+
+    <aside id="rail-left" aria-label="Objective and progress">
+      <h2 id="hud-objective-heading">Goal</h2>
+      <p id="hud-objective"></p>
+      <div class="divider"></div>
+      <h3>Targets</h3>
+      <p id="hud-targets"></p>
+      <div class="divider"></div>
+      <h3>Hint</h3>
+      <p id="hud-hint"></p>
+    </aside>
+
+    <aside id="rail-right" aria-label="Score and shots">
+      <h2>Score</h2>
+      <p id="hud-score" class="big">0</p>
+      <div class="divider"></div>
+      <h3>Shots left</h3>
+      <p id="hud-shots" class="big"></p>
+      <div class="divider"></div>
+      <h3>Best</h3>
+      <p id="hud-best"></p>
+    </aside>
+
+    <footer id="bottom-bar">
+      <button id="btn-pause" type="button" aria-label="Pause">&#10074;&#10074; Pause</button>
+      <span id="hint-text" role="note"></span>
+      <div class="spacer"></div>
+      <button id="btn-skip" type="button" aria-label="Fast-forward resolution">&#9193;</button>
+      <button id="btn-undo" type="button" aria-label="Undo shot (practice)" disabled>&#8617;</button>
+      <button id="btn-restart" type="button" aria-label="Restart level">&#8635;</button>
+    </footer>
+
+    <!-- Board state mirror for assistive tech: concise navigable model -->
+    <div id="sr-board" class="sr-only" aria-label="Board state"></div>
+    <div id="live" class="sr-only" role="status" aria-live="polite"></div>
+    <div id="live-alert" class="sr-only" role="alert"></div>
+  </main>
+
+  <!-- Overlay screens -->
+  <div id="overlay-root">
+
+    <section id="ov-title" class="panel" role="dialog" aria-labelledby="title-h">
+      <h1 id="title-h">Sky Sling</h1>
+      <p class="sub">A breezy island slingshot puzzle. Drag, aim, collapse.</p>
+      <button class="primary" data-action="play" type="button">Play</button>
+      <div class="row">
+        <button data-action="daily" type="button">Daily Challenge</button>
+        <button data-action="journey" type="button">Journey</button>
+      </div>
+      <div class="row">
+        <button data-action="settings" type="button">Settings</button>
+        <button data-action="help" type="button">How to Play</button>
+      </div>
+      <p id="title-progress" class="dim"></p>
+    </section>
+
+    <section id="ov-mode-select" class="panel hidden" role="dialog" aria-labelledby="modes-h">
+      <h2 id="modes-h">Select a mode</h2>
+      <ul class="mode-list">
+        <li><button data-action="learn" type="button"><strong>Learn</strong><small>Interactive lessons, one rule at a time. ~2 min. Unranked.</small></button></li>
+        <li><button data-action="journey" type="button"><strong>Journey</strong><small>45 authored stages with rising difficulty. Progress saved.</small></button></li>
+        <li><button data-action="daily" type="button"><strong>Daily Challenge</strong><small>One shared seed per UTC day. Ranked board.</small></button></li>
+        <li><button data-action="practice" type="button"><strong>Practice</strong><small>Any stage, undo allowed, unranked.</small></button></li>
+        <li><button data-action="challenge" type="button"><strong>Challenge</strong><small>Tighter shot limits on hard layouts. Unranked.</small></button></li>
+      </ul>
+      <button data-action="back-title" type="button">Back</button>
+    </section>
+
+    <section id="ov-level-select" class="panel wide hidden" role="dialog" aria-labelledby="levels-h">
+      <h2 id="levels-h">Journey stages</h2>
+      <div id="level-grid" role="list"></div>
+      <button data-action="back-modes" type="button">Back</button>
+    </section>
+
+    <section id="ov-help" class="panel hidden" role="dialog" aria-labelledby="help-h">
+      <h2 id="help-h">How to play</h2>
+      <div class="rule-cards">
+        <article class="rule-card"><h3>Aim</h3><p>Drag back from the slingshot pouch (mouse, touch, or arrow keys). The dotted arc previews your shot.</p></article>
+        <article class="rule-card"><h3>Launch</h3><p>Release or press <kbd>Space</kbd> to launch. Each launch uses one shot.</p></article>
+        <article class="rule-card"><h3>Collapse</h3><p>Knock out supports; falling blocks crush the green Bumbles. Clear every target before shots run out.</p></article>
+        <article class="rule-card"><h3>Materials</h3><p>Ice (pale, smooth) breaks easily, wood (brown) is sturdy, stone (grey) is tough.</p></article>
+        <article class="rule-card"><h3>Keyboard</h3><p><kbd>&larr;&rarr;&uarr;&darr;</kbd> aim, <kbd>Space</kbd> launch, <kbd>P</kbd>/<kbd>Esc</kbd> pause, <kbd>R</kbd> restart, <kbd>U</kbd> undo in practice, <kbd>S</kbd> fast-forward.</p></article>
+        <article class="rule-card"><h3>Score</h3><p>Targets 1000 each, blocks by material, plus 500 per unused shot. Beat par for stars.</p></article>
+      </div>
+      <button data-action="close-help" type="button">Close</button>
+    </section>
+
+    <section id="ov-pause" class="panel hidden" role="dialog" aria-labelledby="pause-h">
+      <h2 id="pause-h">Paused</h2>
+      <button class="primary" data-action="resume" type="button">Resume</button>
+      <div class="row">
+        <button data-action="restart" type="button">Restart</button>
+        <button data-action="help" type="button">Help</button>
+        <button data-action="settings" type="button">Settings</button>
+      </div>
+      <button data-action="quit-title" type="button">Leave round</button>
+    </section>
+
+    <section id="ov-settings" class="panel hidden" role="dialog" aria-labelledby="settings-h">
+      <h2 id="settings-h">Settings</h2>
+      <fieldset>
+        <legend>Audio</legend>
+        <label>Music <input type="range" min="0" max="1" step="0.05" data-setting-range="music"></label>
+        <label>Effects <input type="range" min="0" max="1" step="0.05" data-setting-range="sfx"></label>
+        <label>Ambience <input type="range" min="0" max="1" step="0.05" data-setting-range="ambience"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Graphics</legend>
+        <label>Quality
+          <select data-setting-select="quality">
+            <option value="0">Low</option><option value="1">Medium</option><option value="2">High</option>
+          </select>
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Accessibility</legend>
+        <label><input type="checkbox" data-setting-check="reducedMotion"> Reduced motion</label>
+        <label><input type="checkbox" data-setting-check="highContrast"> High contrast</label>
+        <label><input type="checkbox" data-setting-check="largeText"> Larger text</label>
+        <label><input type="checkbox" data-setting-check="leftHanded"> Left-handed controls</label>
+        <label><input type="checkbox" data-setting-check="timingAssist"> Timing assist (longer aim window)</label>
+        <label><input type="checkbox" data-setting-check="haptics"> Haptics</label>
+      </fieldset>
+      <button data-action="close-settings" type="button">Done</button>
+    </section>
+
+    <section id="ov-results" class="panel hidden" role="dialog" aria-labelledby="res-title">
+      <h2 id="res-title"></h2>
+      <p id="res-score" class="big"></p>
+      <table id="res-breakdown">
+        <caption class="sr-only">Score breakdown</caption>
+        <tbody></tbody>
+      </table>
+      <p id="res-stars" aria-label="Stars earned"></p>
+      <p id="res-achievement" class="accent"></p>
+      <p id="res-ranked" class="dim"></p>
+      <div class="row">
+        <button class="primary" data-action="retry" type="button">Retry</button>
+        <button data-action="next" type="button" id="btn-next">Next stage</button>
+      </div>
+      <button data-action="quit-title" type="button">Menu</button>
+    </section>
+
+    <section id="ov-error" class="panel hidden" role="alertdialog" aria-labelledby="err-h">
+      <h2 id="err-h">Something went wrong</h2>
+      <pre id="err-text"></pre>
+      <button data-action="close-error" type="button">Close</button>
+    </section>
+
+    <section id="ov-compat" class="panel hidden" role="alertdialog" aria-labelledby="compat-h">
+      <h2 id="compat-h">3D unavailable</h2>
+      <p>Sky Sling needs WebGL. Your progress is saved; try a browser with WebGL enabled to play.</p>
+    </section>
+
+    <div id="countdown" class="hidden" aria-hidden="true"></div>
+  </div>
+
+  <noscript><p>Sky Sling requires JavaScript and WebGL.</p></noscript>
+</div>
+<script src="./boot.js"></script>
+</body>
+</html>

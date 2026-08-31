@@ -1,0 +1,86 @@
+[
+  {
+    "name": "sling-stretch",
+    "seconds": 1,
+    "prompt": "Rubber slingshot band stretching taut, slow creaking elastic strain with a faint leather pouch squeak",
+    "event": "drag"
+  },
+  {
+    "name": "sling-release",
+    "seconds": 1,
+    "prompt": "Slingshot rubber band snapping forward on release, sharp elastic snap followed by a quick wooden frame knock",
+    "event": "launch"
+  },
+  {
+    "name": "bird-whoosh",
+    "seconds": 1,
+    "prompt": "Fast airy whoosh of a small projectile rushing through open sky, rising then fading wind rush",
+    "event": "launch"
+  },
+  {
+    "name": "impact-thud",
+    "seconds": 1,
+    "prompt": "Heavy dull thud of a round body slamming into a wooden structure, low punchy impact with short rattle",
+    "event": "impact"
+  },
+  {
+    "name": "wood-crack",
+    "seconds": 1,
+    "prompt": "Single wooden plank cracking and splitting under stress, sharp dry fracture snap",
+    "event": "wood"
+  },
+  {
+    "name": "wood-tumble",
+    "seconds": 2,
+    "prompt": "Several wooden blocks clattering and tumbling onto each other, hollow knocking cascade settling to silence",
+    "event": "wood"
+  },
+  {
+    "name": "stone-crunch",
+    "seconds": 1,
+    "prompt": "Hard stone block grinding crunch, brittle rocky crack with gritty debris crumble",
+    "event": "stone"
+  },
+  {
+    "name": "stone-rumble",
+    "seconds": 2,
+    "prompt": "Heavy stone blocks collapsing in a low rumble, deep rocky thuds and rolling gravel settling",
+    "event": "stone"
+  },
+  {
+    "name": "target-pop",
+    "seconds": 1,
+    "prompt": "Squashy cartoonish pop of a small round creature being squished, wet bubbly burst with a tiny squeak",
+    "event": "target"
+  },
+  {
+    "name": "win-fanfare",
+    "seconds": 2,
+    "prompt": "Cheerful short brass and bell fanfare, bright rising three-note victory jingle ending on a warm sustained chord",
+    "event": "win"
+  },
+  {
+    "name": "lose-deflate",
+    "seconds": 2,
+    "prompt": "Sad descending slide-whistle droop like air slowly leaking from a balloon, gentle deflating fall in pitch",
+    "event": "lose"
+  },
+  {
+    "name": "invalid-buzz",
+    "seconds": 1,
+    "prompt": "Short low muted buzzer honk signaling a rejected action, soft dull double buzz",
+    "event": "invalid"
+  },
+  {
+    "name": "ui-click",
+    "seconds": 1,
+    "prompt": "Soft crisp UI button click, short muted fingertip tap on a plastic key",
+    "event": "ui"
+  },
+  {
+    "name": "ui-chime",
+    "seconds": 1,
+    "prompt": "Gentle single glassy chime note for menu confirmation, soft bell ping with a short shimmer tail",
+    "event": "ui"
+  }
+]
