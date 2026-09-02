@@ -146,7 +146,9 @@ kbd { background: #111; border: 1px solid #555; border-radius: 4px; padding: 0 5
   aside { position: static; }
   #rail-left, #rail-right { display: inline-block; margin: 4px; vertical-align: top; }
   #game-region { display: flex; flex-direction: column; }
-  #gl-canvas { position: relative; flex: 1; }
+  /* min-height/min-width: 0 let the canvas shrink below its drawing-buffer
+     intrinsic size so the column fits the viewport height. */
+  #gl-canvas { position: relative; flex: 1; min-height: 0; min-width: 0; }
   #top-bar { position: relative; padding-top: calc(6px + var(--safe-top)); background: var(--panel-bg); }
   #bottom-bar { position: relative; padding-bottom: calc(10px + var(--safe-bottom)); background: var(--panel-bg); }
   .hud-rails { order: 2; }
