@@ -55,7 +55,7 @@ body {
 #bottom-bar { bottom: 0; padding-bottom: calc(8px + var(--safe-bottom)); }
 #top-bar > *, #bottom-bar > * { pointer-events: auto; }
 #hud-title { font-size: 1.1rem; margin: 0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
-#hud-mode { color: var(--accent-2); font-size: 0.85rem; }
+#hud-mode { color: var(--accent-2); font-size: 0.85rem; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
 #hint-text { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); font-size: 0.9rem; }
 
 aside {
@@ -151,7 +151,12 @@ kbd { background: #111; border: 1px solid #555; border-radius: 4px; padding: 0 5
   #gl-canvas { position: relative; flex: 1; min-height: 0; min-width: 0; }
   #top-bar { position: relative; padding-top: calc(6px + var(--safe-top)); background: var(--panel-bg); }
   #bottom-bar { position: relative; padding-bottom: calc(10px + var(--safe-bottom)); background: var(--panel-bg); }
-  .hud-rails { order: 2; }
+  /* The canvas comes first in the DOM (it is the labelled region's content), so
+     the flex column needs explicit ordering to keep the title bar on top. */
+  #top-bar { order: 0; }
+  #gl-canvas { order: 1; }
+  #rail-left, #rail-right { order: 2; }
+  #bottom-bar { order: 3; }
 }
 
 /* Landscape mobile: narrow rails, keep 44px targets */

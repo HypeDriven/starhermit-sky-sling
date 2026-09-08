@@ -12,7 +12,6 @@
   var renderer = null;
   var lastTs = 0;
   var hidden = false;
-  var cmdCounter = 0;
   var lastLaunchCmd = null;   // action identifier: reject duplicate commits
   var countdownTimer = null;
 
@@ -84,6 +83,7 @@
     if (!res.ok) { UI.showError(res.reason); return; }
     lastLaunchCmd = null;
     kbAim.active = false;
+    UI.showAchievement(null);
     renderer.buildLevel(session.level);
     renderer.sync(session.state);
     UI.show(null);
@@ -92,6 +92,16 @@
     UI.setHUD({ hint: tut ? tut.text : '', hintText: tut ? tut.text : 'Drag to aim, release to launch' });
     if (tut) UI.announce('Lesson: ' + tut.text);
     syncHUD();
+  }
+
+  // Which overlay a modal (help / settings / error) should return to when it
+  // closes. Without this a modal opened from the title or the results screen
+  // would close onto an empty screen.
+  function overlayForScreen() {
+    if (session.screen === 'paused') return 'ov-pause';
+    if (session.screen === 'results') return 'ov-results';
+    if (session.screen === 'active' || session.screen === 'resolving') return null;
+    return 'ov-title';
   }
 
   function toTitle() {
@@ -131,15 +141,9 @@
     practice: function () { A.unlock(); A.play('ui'); startRound('practice', 0); },
     challenge: function () { A.unlock(); A.play('ui'); startRound('challenge', 12); },
     settings: function () { A.play('ui'); UI.show('ov-settings'); },
-    'close-settings': function () {
-      A.play('ui');
-      UI.show(session.screen === 'paused' ? 'ov-pause' : (session.state && !session.state.over ? null : 'ov-title'));
-    },
+    'close-settings': function () { A.play('ui'); UI.show(overlayForScreen()); },
     help: function () { A.play('ui'); UI.show('ov-help'); },
-    'close-help': function () {
-      A.play('ui');
-      UI.show(session.screen === 'paused' ? 'ov-pause' : null);
-    },
+    'close-help': function () { A.play('ui'); UI.show(overlayForScreen()); },
     resume: function () { A.play('ui'); session.resume(); UI.show(null); },
     restart: function () { A.play('ui'); startRound(session.mode || 'journey', session.level ? session.level.index : 0); },
     retry: function () { A.play('ui'); startRound(session.mode || 'journey', session.level ? session.level.index : 0); },
@@ -157,7 +161,7 @@
     'quit-title': function () { A.play('ui'); toTitle(); },
     'back-title': function () { A.play('ui'); toTitle(); },
     'back-modes': function () { A.play('ui'); UI.show('ov-mode-select'); },
-    'close-error': function () { UI.show(null); }
+    'close-error': function () { UI.show(overlayForScreen()); }
   };
 
   // ---- pause / menu buttons ---------------------------------------------------------------
@@ -173,7 +177,11 @@
     document.getElementById('btn-undo').addEventListener('click', function () {
       var r = session.undo();
       if (!r.ok) { UI.alert('Undo not available here.'); A.play('invalid'); }
-      else { renderer.sync(session.state); syncHUD(); UI.announce('Shot undone.'); }
+      else {
+        // the restored state can re-issue the same launch identifier
+        lastLaunchCmd = null;
+        renderer.sync(session.state); syncHUD(); UI.announce('Shot undone.');
+      }
     });
     document.getElementById('btn-skip').addEventListener('click', function () {
       if (session.screen === 'resolving') { session.skip(); renderer.sync(session.state); syncHUD(); }
@@ -215,10 +223,11 @@
       renderer.hideAim();
       var pull = Math.sqrt(p.dx * p.dx + p.dy * p.dy);
       if (cancelled || pull < 0.3) return; // treated as a tap, not a launch
-      // velocity: opposite the drag, clamped
+      // velocity: opposite the drag on both axes (pull back and down to send the
+      // shot forward and up), matching the aim preview and the keyboard aim
       var scale = Math.min(pull, R.MAX_PULL) / pull;
       var vx = -p.dx * scale * R.LAUNCH_POWER;
-      var vy = p.dy * scale * R.LAUNCH_POWER;
+      var vy = -p.dy * scale * R.LAUNCH_POWER;
       doLaunch(vx, vy);
     }
     canvas.addEventListener('pointerup', function (e) { release(e, false); });
@@ -227,11 +236,14 @@
   }
 
   function doLaunch(vx, vy) {
-    var id = 'launch-' + (++cmdCounter) + '-' + session.state.tick;
+    // Derived from round state, not a counter, so a repeated commit of the same
+    // shot (double release / duplicated pointer event) is actually rejected.
+    var id = 'launch-' + session.state.shotsUsed + '-' + session.state.tick;
     if (id === lastLaunchCmd) return;       // idempotent double-commit guard
     var res = session.launch(id, vx, vy);
     if (res.ok) {
       lastLaunchCmd = id;
+      renderer.hideAim();   // hand the bird back to the simulation
       A.play('launch');
       UI.announce('Launched.');
       if (session.settings.haptics && navigator.vibrate) { try { navigator.vibrate(15); } catch (_) {} }
@@ -253,6 +265,12 @@
         }
         e.preventDefault(); return;
       }
+      // fast-forward is only meaningful while a shot is resolving, so it has to
+      // be handled before the aim-phase guard below
+      if (k === 's' || k === 'S') {
+        if (session.screen === 'resolving') { document.getElementById('btn-skip').click(); e.preventDefault(); }
+        return;
+      }
       if (session.screen !== 'active') return;
       if (k === 'r' || k === 'R') { actions.restart(); e.preventDefault(); return; }
       if (k === 'u' || k === 'U') { document.getElementById('btn-undo').click(); e.preventDefault(); return; }
@@ -265,8 +283,6 @@
       else if (k === ' ' || k === 'Enter') {
         if (kbAim.active) { doLaunch(kbAim.vx, kbAim.vy); kbAim.active = false; }
         e.preventDefault(); return;
-      } else if (k === 's' || k === 'S') {
-        document.getElementById('btn-skip').click(); return;
       } else return;
       e.preventDefault();
       // preview keyboard aim as a pull vector
@@ -298,7 +314,9 @@
 
   function onResults(result) {
     renderer.sync(session.state);
-    var stars = 0;
+    // stars are a journey-progression reward; other modes show none rather than
+    // an all-empty row that reads as "you earned zero stars"
+    var stars = null;
     if (result.won && session.mode === 'journey') {
       stars = session.progress.stars[session.level.index] || 1;
     }
@@ -351,6 +369,7 @@
       A.setBackground(hidden);
       if (hidden && (session.screen === 'active' || session.screen === 'resolving')) {
         session.pause(); // backgrounding pauses solo simulation
+        UI.show('ov-pause'); // ...and says so, so the round is resumable on return
       }
     });
     var canvas = document.getElementById('gl-canvas');

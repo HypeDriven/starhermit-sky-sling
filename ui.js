@@ -43,8 +43,14 @@
       var panel = $(id);
       var focusable = panel && panel.querySelector('button, [href], input, select, [tabindex]');
       if (focusable) setTimeout(function () { focusable.focus(); }, 0);
-    } else if (_lastFocus && document.contains(_lastFocus)) {
+    } else if (_lastFocus && document.contains(_lastFocus) && _lastFocus.offsetParent) {
+      // only restore focus to a control that is still on screen, and only once:
+      // hiding overlays happens on every settled shot, and re-focusing a stale
+      // control each time would yank focus away mid-round.
       _lastFocus.focus();
+      _lastFocus = null;
+    } else {
+      _lastFocus = null;
     }
   }
 
@@ -96,14 +102,17 @@
       var b = document.createElement('td'); b.textContent = row[1];
       tr.appendChild(a); tr.appendChild(b); tb.appendChild(tr);
     });
-    $('res-stars').textContent = result.won ? '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars) : '';
+    $('res-stars').textContent = (result.won && stars != null)
+      ? '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars) : '';
     $('res-ranked').textContent = rankedNote || '';
     show('ov-results');
     announce((result.won ? 'Stage clear. ' : 'Out of shots. ') + 'Score ' + result.score.total + '.');
   }
 
+  // name = null clears the banner (called at round start so an achievement from
+  // an earlier round never re-appears on the next results screen)
   function showAchievement(name) {
-    $('res-achievement').textContent = 'Achievement unlocked: ' + name;
+    $('res-achievement').textContent = name ? 'Achievement unlocked: ' + name : '';
   }
 
   // ---- level select grid -----------------------------------------------------------

@@ -84,6 +84,10 @@
     var step = 0;
     function schedule() {
       if (!_ctx) return;
+      // A suspended context (backgrounded tab) has a frozen clock: scheduling
+      // into it would pile every missed note onto the same instant and fire
+      // them all at once on resume.
+      if (_ctx.state !== 'running') { timer.id = setTimeout(schedule, 900); return; }
       var t = _ctx.currentTime;
       var o = _ctx.createOscillator(), g = _ctx.createGain();
       o.type = 'triangle';

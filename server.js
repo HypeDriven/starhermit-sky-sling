@@ -56,6 +56,11 @@ function saveScores(db) {
 var rate = {};
 function rateOk(ip) {
   var now = Date.now();
+  // drop clients whose window has fully expired, so the map cannot grow without
+  // bound over a long-lived process
+  Object.keys(rate).forEach(function (k) {
+    if (k !== ip && (!rate[k].length || now - rate[k][rate[k].length - 1] >= 60000)) delete rate[k];
+  });
   var rec = rate[ip] = (rate[ip] || []).filter(function (t) { return now - t < 60000; });
   if (rec.length >= 10) return false;
   rec.push(now);
@@ -156,7 +161,9 @@ var server = http.createServer(function (req, res) {
 
   // static files (path-traversal safe)
   if (req.method !== 'GET' && req.method !== 'HEAD') return sendErr(res, 405, 'method-not-allowed');
-  var rel = url === '/' ? '/index.html' : decodeURIComponent(url);
+  var rel;
+  try { rel = url === '/' ? '/index.html' : decodeURIComponent(url); } catch (_) { return sendErr(res, 400, 'bad-path'); }
+  if (rel.split(/[\\/]/).some(function (p) { return p.charAt(0) === '.' || p === 'data' || p === 'node_modules'; })) return sendErr(res, 403, 'forbidden');
   var file = path.normalize(path.join(ROOT, rel));
   if (file.indexOf(ROOT + path.sep) !== 0 && file !== ROOT) return sendErr(res, 403, 'forbidden');
   fs.readFile(file, function (err, data) {
