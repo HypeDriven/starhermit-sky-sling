@@ -131,6 +131,7 @@
       A.play('ui');
       var unlocked = 0;
       for (var i = 0; i < C.LEVEL_COUNT; i++) if (session.progress.stars[i]) unlocked = i + 1;
+      document.getElementById('levels-h').textContent = 'Journey stages';
       UI.buildLevelGrid(C.LEVEL_COUNT, session.progress.stars, unlocked, function (idx) {
         startRound('journey', idx);
       });
@@ -138,7 +139,16 @@
       UI.show('ov-level-select');
     },
     learn: function () { A.unlock(); A.play('ui'); startRound('learn', 0); },
-    practice: function () { A.unlock(); A.play('ui'); startRound('practice', 0); },
+    practice: function () {
+      A.unlock(); A.play('ui');
+      // practice is "any stage": all stages unlocked, still star-marked, unranked
+      document.getElementById('levels-h').textContent = 'Practice stages';
+      UI.buildLevelGrid(C.LEVEL_COUNT, session.progress.stars, C.LEVEL_COUNT, function (idx) {
+        startRound('practice', idx);
+      });
+      session.setScreen('mode-select', 'practice-grid');
+      UI.show('ov-level-select');
+    },
     challenge: function () { A.unlock(); A.play('ui'); startRound('challenge', 12); },
     settings: function () { A.play('ui'); UI.show('ov-settings'); },
     'close-settings': function () { A.play('ui'); UI.show(overlayForScreen()); },
@@ -297,7 +307,7 @@
       if (evt.type === 'sim') {
         var s = evt.sim;
         if (s.type === 'impact') { A.play('impact'); renderer.spawnImpact(session.state.bird.x, session.state.bird.y, false); }
-        else if (s.type === 'block-down') { A.play('wood'); renderer.spawnImpact(session.state.bird.x, session.state.bird.y, true); }
+        else if (s.type === 'block-down') { A.play(s.mat === 'stone' ? 'stone' : 'wood'); renderer.spawnImpact(session.state.bird.x, session.state.bird.y, true); }
         else if (s.type === 'target-down') { A.play('target'); UI.announce('Target down!'); }
         else if (s.type === 'win') A.play('win');
         else if (s.type === 'lose') A.play('lose');
@@ -395,6 +405,7 @@
     A.setLevel('music', s.music);
     A.setLevel('sfx', s.sfx);
     A.setLevel('ambience', s.ambience);
+    A.setLevel('voice', s.voice);
     UI.applyA11yClasses(s);
     if (renderer && renderer.ok) {
       renderer.setTier(s.quality);

@@ -192,7 +192,7 @@
           if (b.hp <= 0) {
             b.alive = false;
             state.destroyedBlocks++;
-            events.push({ type: 'block-down', id: b.id });
+            events.push({ type: 'block-down', id: b.id, mat: b.mat });
           }
           bird.vx *= 0.45; bird.vy *= 0.45;
         }
@@ -242,7 +242,7 @@
           if (b.hp <= 0) {
             b.alive = false;
             state.destroyedBlocks++;
-            events.push({ type: 'block-down', id: b.id });
+            events.push({ type: 'block-down', id: b.id, mat: b.mat });
           }
         } else {
           // land on another block
@@ -260,7 +260,7 @@
               if (b.hp <= 0) {
                 b.alive = false;
                 state.destroyedBlocks++;
-                events.push({ type: 'block-down', id: b.id });
+                events.push({ type: 'block-down', id: b.id, mat: b.mat });
               }
               break;
             }
