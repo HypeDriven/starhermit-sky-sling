@@ -286,7 +286,71 @@ test('session: save document checksum catches corruption', function () {
   }
 });
 
-// ---- server validation logic ---------------------------------------------------------------
+// ---- platform integration ---------------------------------------------------------------
+var P = require('./platform');
+
+test('platform: stored-zip round-trips payload and base64', function () {
+  var zip = P._zip;
+  var payload = new TextEncoder().encode(JSON.stringify({ hello: 'sky-sling', n: 42 }));
+  var zipped = zip.zipStore('skysling-progress.json', payload);
+  var back = zip.unzipFirstEntry(zipped);
+  assert.deepStrictEqual(Array.from(back), Array.from(payload));
+  assert.strictEqual(new TextDecoder().decode(back), '{"hello":"sky-sling","n":42}');
+  var b64 = zip.bytesToBase64(zipped);
+  assert.deepStrictEqual(Array.from(zip.base64ToBytes(b64)), Array.from(zipped));
+});
+
+test('platform: hosted is false without a launch token (node has no location)', function () {
+  assert.strictEqual(P.hosted, false);
+  assert.strictEqual(P.token, null);
+  // local play: cloud ops are no-ops, sync stays offline, never throws
+  return P.loadCloud().then(function (d) {
+    assert.strictEqual(d, null);
+    assert.strictEqual(P.syncStatus, 'offline');
+  });
+});
+
+test('session: progress save emits event for the cloud mirror', function () {
+  var sess = new S.Session();
+  var seen = 0;
+  sess.on(function (evt) { if (evt.type === 'progress') seen++; });
+  sess.progress.stars[1] = 2;
+  sess._saveProgress();
+  assert.strictEqual(seen, 1);
+});
+
+test('session: adoptProgress merges remote-preferred without losing local clears', function () {
+  var sess = new S.Session();
+  sess.progress.stars[0] = 1;
+  sess.progress.bestScores[0] = 500;
+  sess.progress.counters.launches = 7;
+  sess.progress.achievements['first-clear'] = true;
+  sess._saveProgress();
+  // fabricate a remote doc with different, overlapping progression
+  var remote = JSON.parse(JSON.stringify(sess.progress));
+  remote.stars[0] = 3;          // remote ahead on the same stage
+  remote.stars[2] = 2;          // remote-only stage
+  remote.bestScores[0] = 900;
+  remote.counters.launches = 3; // local ahead on the counter
+  remote.achievements['streak-3'] = true;
+  var R2 = require('./rules');
+  remote.sum = R2.fnv1a(JSON.stringify({ v: remote.v, stars: remote.stars, achievements: remote.achievements, counters: remote.counters }));
+  var adopted = sess.adoptProgress(remote);
+  assert.strictEqual(adopted, true);
+  assert.strictEqual(sess.progress.stars[0], 3);   // remote wins the max
+  assert.strictEqual(sess.progress.stars[2], 2);   // remote-only kept
+  assert.strictEqual(sess.progress.bestScores[0], 900);
+  assert.strictEqual(sess.progress.counters.launches, 7); // local max kept
+  assert.ok(sess.progress.achievements['first-clear']);
+  assert.ok(sess.progress.achievements['streak-3']);
+  // corrupt remote docs are ignored
+  var bad = JSON.parse(JSON.stringify(remote));
+  bad.stars[0] = 99; // tamper without fixing the checksum
+  assert.strictEqual(sess.adoptProgress(bad), false);
+  assert.strictEqual(sess.progress.stars[0], 3);
+});
+
+
 test('server: validateSubmission accepts honest replay, rejects cheats', function () {
   var srv = require('./server');
   var lv = C.makeDaily(new Date());

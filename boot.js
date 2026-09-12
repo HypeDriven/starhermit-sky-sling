@@ -9,6 +9,7 @@
   var R = SS.rules, C = SS.content, A = SS.audio, UI = SS.ui;
 
   var session = new SS.session.Session();
+  var platform = SS.platform;   // launch-token auth, cloud mirror, read-only board
   var renderer = null;
   var lastTs = 0;
   var hidden = false;
@@ -18,27 +19,39 @@
   // keyboard aim state (velocity vector adjusted by arrows)
   var kbAim = { active: false, vx: 9, vy: 7 };
 
-  // ---- platform adapter (same-origin /api when hosted; offline-tolerant) -----
-  var platform = {
-    serverOffset: 0,
-    time: function () {
-      return fetch('/api/v1/time').then(function (r) { return r.json(); }).then(function (d) {
-        var after = Date.now();
-        platform.serverOffset = d.now - after; // round-trip-adjusted offset (approx)
-        return d;
-      }).catch(function () { return null; }); // offline: keep local clock
-    },
-    daily: function () {
-      return fetch('/api/v1/daily').then(function (r) { return r.json(); })
-        .catch(function () { return null; });
-    },
-    submitScore: function (payload) {
-      return fetch('/api/v1/scores', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: 'offline' }; });
-    }
-  };
+  // ---- hosted daily board (read-only; clients can never submit scores) -------------
+  function showHostedDailyBoard(myScore) {
+    UI.showBoard(null);
+    platform.leaderboardInfo().then(function (info) {
+      var note = 'Daily board is platform-owned — read-only. Your score: ' + myScore + '.';
+      if (!info || !info.leaderboardId) {
+        document.getElementById('res-ranked').textContent = note + ' No board for this game yet.';
+        return null;
+      }
+      if (info.me && typeof info.me.score === 'number') {
+        note += ' Board best: ' + info.me.score + '.';
+      }
+      document.getElementById('res-ranked').textContent = note;
+      return platform.leaderboardEntries(info.leaderboardId, { page: 0, pageSize: 10 });
+    }).then(function (list) {
+      if (!list) return;
+      var entries = list.entries || list || [];
+      if (!entries.length) return;
+      return Promise.all(entries.map(function (e) {
+        var id = e.userId != null ? e.userId : (e.user_id != null ? e.user_id : e.id);
+        return platform.nicknameFor(id).then(function (nick) {
+          return {
+            rank: typeof e.rank === 'number' ? e.rank : null,
+            score: e.score,
+            userId: id != null ? String(id) : null,
+            nickname: nick || (id != null ? 'Player ' + String(id).slice(0, 8) : 'Player')
+          };
+        });
+      })).then(function (rows) {
+        UI.showBoard(rows, platform.userId);
+      });
+    }).catch(function () {});
+  }
 
   // ---- renderer setup -----------------------------------------------------------
   function setupRenderer() {
@@ -316,6 +329,8 @@
       } else if (evt.type === 'achievement') {
         var meta = SS.session.ACHIEVEMENTS.filter(function (a) { return a.key === evt.key; })[0];
         if (meta) { UI.showAchievement(meta.name); UI.announce('Achievement unlocked: ' + meta.name); }
+      } else if (evt.type === 'progress') {
+        platform.scheduleCloudSave(session.progress); // debounced cloud mirror
       } else if (evt.type === 'screen' && (evt.to === 'active')) {
         UI.show(null);
       }
@@ -333,17 +348,26 @@
     var note = '';
     if (result.ranked) {
       var envelope = session.finishEnvelope();
-      note = 'Submitting to daily board\u2026';
-      UI.showResults(result, stars, note);
-      platform.submitScore({
-        board: 'daily', key: session.level.id,
-        name: 'guest', score: result.score.total,
-        envelope: envelope
-      }).then(function (res) {
-        document.getElementById('res-ranked').textContent =
-          res && res.ok ? 'Ranked: submitted (validated server-side).' :
-          'Daily board unavailable (' + ((res && res.error) || 'offline') + ') — score kept locally.';
-      });
+      if (platform.hosted) {
+        // platform leaderboard is read-only; scores can never be client-submitted
+        note = 'Daily board is platform-owned — read-only. Your score: ' + result.score.total + '.';
+        UI.showResults(result, stars, note);
+        showHostedDailyBoard(result.score.total);
+      } else {
+        note = 'Submitting to daily board…';
+        UI.showResults(result, stars, note);
+        platform.submitScore({
+          board: 'daily', key: session.level.id,
+          name: platform.nickname || 'guest', score: result.score.total,
+          envelope: envelope
+        }).then(function (res) {
+          var msg = res && res.ok
+            ? 'Ranked: submitted (validated server-side).'
+            : 'Daily board unavailable (' + ((res && res.error) || 'offline') + ') — score kept locally.';
+          if (res && res.ok && typeof res.rank === 'number') msg += ' Rank #' + res.rank + '.';
+          document.getElementById('res-ranked').textContent = msg;
+        });
+      }
     } else {
       note = session.mode === 'practice' ? 'Practice — unranked.' : '';
       UI.showResults(result, stars, note);
@@ -416,6 +440,13 @@
   // ---- boot -----------------------------------------------------------------------------------------------
   function boot() {
     UI.init(actions);
+    // hosted iff a launch token was read (fragment, stripped; query = local dev)
+    platform.init();
+    platform.onSyncStatus = function (status) { UI.setSyncStatus(status); };
+    platform.loadProfile().then(function () {
+      UI.setProfileName(platform.nickname); // null in local play → slot stays hidden
+      UI.setSyncStatus(platform.syncStatus);
+    });
     wireChrome(); wirePointer(); wireKeyboard(); wireSession(); wireLifecycle();
     UI.bindSettings(session.settings, function (key, val) {
       var patch = {}; patch[key] = val;
@@ -426,6 +457,10 @@
     applySettings();
     waitForTHREE(function (hasTHREE) {
       if (!hasTHREE || !setupRenderer()) { UI.show('ov-compat'); return; }
+      // remote-preferred progress: adopt the cloud doc (on conflict) once ready
+      platform.loadCloud().then(function (doc) {
+        if (doc && session.adoptProgress(doc) && session.screen === 'title') toTitle();
+      });
       toTitle();
       requestAnimationFrame(loop);
     }, 30);

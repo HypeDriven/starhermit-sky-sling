@@ -162,7 +162,7 @@ Follow the skill pack's acceptance gate: deterministic seeds, debug views for co
 - `ui`: responsive DOM shell, focus, localization, settings, overlays, accessibility mirror.
 - `audio`: buses, event mapping, focus/background behavior, decode and memory policy.
 - `content`: versioned levels, themes, tutorials, validation metadata.
-- `platform`: token-aware REST/WebSocket adapter, retries, rate-limit handling, telemetry consent.
+- `platform`: launch-token REST adapter — fragment token read/strip, 45-min launch-token refresh, profile fetch, cloud-save mirror, read-only leaderboard, offline-tolerant its-backend calls.
 
 No module may mutate rules state except through a validated command. Rendering consumes immutable snapshots plus interpolation data. UI state and simulation state are separate so closing a drawer cannot affect a match.
 
@@ -185,8 +185,8 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Sky Sling`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token rather than hard-coding a slug. Use same-origin `/api` and `/ws` routes when hosted. Refresh account tokens through the host shell; never persist access or launch tokens in local storage.
-- Synchronize countdowns and daily boundaries with `GET /api/v1/time` using round-trip-adjusted offset. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
+- Read the launch token once from the `#game_token` URL fragment (then strip it; query params are a local-dev fallback). Read the game scope from the token's `game_scope` rather than hard-coding a slug, and identity from `sub` via `GET /api/v1/users/{sub}/profile`. Use same-origin `/api` routes when hosted; refresh the token every 45 min with `POST /api/v1/games/{slug}/launch-token`; never persist access or launch tokens in local storage.
+- Daily mode derives its seed from the UTC date, so it is shared by construction; when running against the game's own server.js (local dev), `GET /api/v1/time` / `/api/v1/daily` confirm the shared seed and server-time offset, and ranked scores are submitted there as replay-validated claims. On the platform host those routes do not exist: the daily runs on the local clock and the daily board is read-only (clients can never submit; `GET /api/v1/games/{slug}` + `GET /api/v1/leaderboards/{id}/entries`).
 
 ### Identity, profile, presence, and preferences
 - Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy, and send throttled presence heartbeats while actively playing.

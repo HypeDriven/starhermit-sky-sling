@@ -94,6 +94,49 @@
   Session.prototype._saveProgress = function () {
     this.progress.sum = checksum(this.progress);
     saveJSON(PROGRESS_KEY, this.progress);
+    this._emit({ type: 'progress', progress: this.progress });
+  };
+
+  // Cloud (remote-preferred) merge: adopt a remote save doc, never losing local
+  // clears/bests. Progression is monotonic, so per-field max wins; corrupt or
+  // foreign docs are ignored. The merged doc is re-persisted locally.
+  Session.prototype.adoptProgress = function (remote) {
+    if (!remote || remote.v !== SAVE_VERSION || checksum(remote) !== remote.sum) return false;
+    var local = this.progress;
+    var k;
+    var merged = {
+      v: SAVE_VERSION, sum: 0,
+      stars: {}, bestScores: {}, achievements: {},
+      counters: { launches: 0, clears: 0, streak: 0 },
+      dailyExcluded: []
+    };
+    function maxInto(dst, src) {
+      for (var key in src) {
+        var v = Math.max(dst[key] || 0, src[key] || 0);
+        if (v) dst[key] = v;
+      }
+    }
+    maxInto(merged.stars, remote.stars);
+    maxInto(merged.stars, local.stars);
+    maxInto(merged.bestScores, remote.bestScores);
+    maxInto(merged.bestScores, local.bestScores);
+    var ach = [remote.achievements, local.achievements];
+    for (var i = 0; i < ach.length; i++) for (k in ach[i]) merged.achievements[k] = true;
+    var cnt = ['launches', 'clears', 'streak'];
+    for (i = 0; i < cnt.length; i++) {
+      merged.counters[cnt[i]] = Math.max(
+        (remote.counters && remote.counters[cnt[i]]) || 0,
+        (local.counters && local.counters[cnt[i]]) || 0);
+    }
+    var ex = [(remote.dailyExcluded || []), (local.dailyExcluded || [])];
+    for (i = 0; i < ex.length; i++) {
+      for (k = 0; k < ex[i].length; k++) {
+        if (merged.dailyExcluded.indexOf(ex[i][k]) < 0) merged.dailyExcluded.push(ex[i][k]);
+      }
+    }
+    this.progress = merged;
+    this._saveProgress(); // persists + emits 'progress' (mirrors to cloud)
+    return true;
   };
 
   Session.prototype.on = function (fn) { this.listeners.push(fn); };

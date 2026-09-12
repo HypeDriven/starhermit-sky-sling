@@ -56,6 +56,11 @@ body {
 #top-bar > *, #bottom-bar > * { pointer-events: auto; }
 #hud-title { font-size: 1.1rem; margin: 0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 #hud-mode { color: var(--accent-2); font-size: 0.85rem; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+#player-name, #sync-status { font-size: 0.8rem; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+#res-board { margin: 0.4em 0; }
+#res-board h3 { margin: 0.3em 0; font-size: 0.95rem; }
+#res-board ol { margin: 0; padding-left: 1.6em; max-height: 9em; overflow-y: auto; }
+#res-board li.me { color: var(--accent-2); font-weight: 700; }
 #hint-text { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); font-size: 0.9rem; }
 
 aside {

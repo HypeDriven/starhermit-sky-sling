@@ -15,6 +15,7 @@
 <script src="./session.js"></script>
 <script src="./render.js"></script>
 <script src="./ui.js"></script>
+<script src="./platform.js"></script>
 <script type="module">
   import * as THREE from './three.min.js';
   window.THREE = THREE;
@@ -34,6 +35,8 @@
       <h1 id="hud-title">Sky Sling</h1>
       <div class="spacer"></div>
       <div id="hud-mode" aria-label="Current mode"></div>
+      <div id="player-name" class="dim" hidden></div>
+      <div id="sync-status" class="dim" hidden></div>
       <button id="btn-help" type="button" aria-label="Help">?</button>
     </header>
 
@@ -173,6 +176,7 @@
       <p id="res-stars" aria-label="Stars earned"></p>
       <p id="res-achievement" class="accent"></p>
       <p id="res-ranked" class="dim"></p>
+      <div id="res-board" class="hidden"></div>
       <div class="row">
         <button class="primary" data-action="retry" type="button">Retry</button>
         <button data-action="next" type="button" id="btn-next">Next stage</button>

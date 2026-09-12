@@ -71,6 +71,54 @@
     if (fields.hintText != null) $('hint-text').textContent = fields.hintText;
   }
 
+  // ---- profile / sync status (hosted only; hidden in local play) ----------------------
+  function setProfileName(name) {
+    var el = $('player-name');
+    if (!el) return;
+    if (name) {
+      el.textContent = name;
+      el.hidden = false;
+      el.setAttribute('title', 'Playing as ' + name);
+    } else {
+      el.textContent = '';
+      el.hidden = true;
+    }
+  }
+
+  var SYNC_LABELS = {
+    synced: 'Progress synced to cloud',
+    saving: 'Saving…',
+    offline: 'Cloud unavailable — local save'
+  };
+  function setSyncStatus(status) {
+    var el = $('sync-status');
+    if (!el) return;
+    var label = SYNC_LABELS[status] || '';
+    el.textContent = label;
+    el.hidden = !label;
+  }
+
+  // Read-only platform board on the results screen: rows = [{rank, nickname, score,
+  // userId}]; meId highlights the signed-in player's row. null clears.
+  function showBoard(rows, meId) {
+    var el = $('res-board');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!rows || !rows.length) { el.classList.add('hidden'); return; }
+    var h = document.createElement('h3');
+    h.textContent = 'Daily board (top ' + rows.length + ')';
+    var ol = document.createElement('ol');
+    rows.forEach(function (e, i) {
+      var li = document.createElement('li');
+      li.textContent = (e.rank != null ? e.rank : i + 1) + '. ' + e.nickname + ' — ' + e.score;
+      if (meId != null && e.userId === String(meId)) li.classList.add('me');
+      ol.appendChild(li);
+    });
+    el.appendChild(h);
+    el.appendChild(ol);
+    el.classList.remove('hidden');
+  }
+
   // ---- accessibility mirrors ---------------------------------------------------
   function announce(text) { $('live').textContent = ''; setTimeout(function () { $('live').textContent = text; }, 20); }
   function alert(text) { $('live-alert').textContent = ''; setTimeout(function () { $('live-alert').textContent = text; }, 20); }
@@ -105,6 +153,7 @@
     $('res-stars').textContent = (result.won && stars != null)
       ? '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars) : '';
     $('res-ranked').textContent = rankedNote || '';
+    showBoard(null);
     show('ov-results');
     announce((result.won ? 'Stage clear. ' : 'Out of shots. ') + 'Score ' + result.score.total + '.');
   }
@@ -179,6 +228,7 @@
   return {
     init: init, show: show, visible: visible,
     setHUD: setHUD, announce: announce, alert: alert, caption: caption,
+    setProfileName: setProfileName, setSyncStatus: setSyncStatus, showBoard: showBoard,
     mirrorBoard: mirrorBoard, showResults: showResults, showAchievement: showAchievement,
     buildLevelGrid: buildLevelGrid, bindSettings: bindSettings,
     applyA11yClasses: applyA11yClasses, showError: showError,
