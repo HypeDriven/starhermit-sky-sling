@@ -23,7 +23,7 @@
     music: 0.6, sfx: 0.9, ambience: 0.5, voice: 0.0,
     reducedMotion: false, highContrast: false, largeText: false,
     leftHanded: false, timingAssist: false, haptics: true,
-    quality: 2,           // 0 low, 1 medium, 2 high
+    graphics: {},         // gfx.js saved settings ({} = Auto preset)
     camera: 'default',
     replayTutorial: false
   };

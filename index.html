@@ -13,11 +13,38 @@
 <script src="./content.js"></script>
 <script src="./audio.js"></script>
 <script src="./session.js"></script>
+<script src="./gfx.js"></script>
 <script src="./render.js"></script>
 <script src="./ui.js"></script>
+<script src="./gfxui.js"></script>
 <script src="./platform.js"></script>
+<script type="importmap">
+  { "imports": { "three": "./three.min.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
 <script type="module">
-  import * as THREE from './three.min.js';
+  import * as THREE from 'three';
+  // Post-processing and geometry addons (same three.js revision, vendored).
+  // Optional: if they fail to load, the game renders without post effects.
+  try {
+    const [ec, rp, sp, op, gt, ub, sm, fx, rb] = await Promise.all([
+      import('three/addons/postprocessing/EffectComposer.js'),
+      import('three/addons/postprocessing/RenderPass.js'),
+      import('three/addons/postprocessing/ShaderPass.js'),
+      import('three/addons/postprocessing/OutputPass.js'),
+      import('three/addons/postprocessing/GTAOPass.js'),
+      import('three/addons/postprocessing/UnrealBloomPass.js'),
+      import('three/addons/postprocessing/SMAAPass.js'),
+      import('three/addons/shaders/FXAAShader.js'),
+      import('three/addons/geometries/RoundedBoxGeometry.js')
+    ]);
+    window.THREE_ADDONS = {
+      EffectComposer: ec.EffectComposer, RenderPass: rp.RenderPass, ShaderPass: sp.ShaderPass,
+      OutputPass: op.OutputPass, GTAOPass: gt.GTAOPass, UnrealBloomPass: ub.UnrealBloomPass,
+      SMAAPass: sm.SMAAPass, FXAAShader: fx.FXAAShader, RoundedBoxGeometry: rb.RoundedBoxGeometry
+    };
+  } catch (e) {
+    window.THREE_ADDONS = { failed: true };
+  }
   window.THREE = THREE;
   window.dispatchEvent(new Event('three-ready'));
 </script>
@@ -146,13 +173,9 @@
         <label>Ambience <input type="range" min="0" max="1" step="0.05" data-setting-range="ambience"></label>
         <label>Voice <input type="range" min="0" max="1" step="0.05" data-setting-range="voice"></label>
       </fieldset>
-      <fieldset>
+      <fieldset id="gfx-section">
         <legend>Graphics</legend>
-        <label>Quality
-          <select data-setting-select="quality">
-            <option value="0">Low</option><option value="1">Medium</option><option value="2">High</option>
-          </select>
-        </label>
+        <div id="gfx-controls"></div>
       </fieldset>
       <fieldset>
         <legend>Accessibility</legend>

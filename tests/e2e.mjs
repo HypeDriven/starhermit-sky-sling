@@ -9,6 +9,8 @@
  *   pause/resume and the settings overlay through the visible controls.
  * A second pass runs the same load → Play → drag-launch on a mobile touch
  * viewport and verifies a real move registers (shots decrement).
+ * A graphics pass (desktop + mobile) drives Settings → Graphics: Ultra in-game,
+ * Low, High plus a bloom override, then checks the choice survives a reload.
  *
  * The game exposes its rules engine on `window.SkySling.rules`. The test wraps
  * only `rules.applyCommand` as a READ-ONLY observer of the live round state
@@ -141,7 +143,7 @@ async function runPass(browser, name, ctxOpts, { full }) {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() !== 'error' || browserNoise.test(m.text())) return;
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
     const url = m.location()?.url || '';
     if (/Failed to load resource/.test(m.text()) && /\/api\/|\/favicon/.test(url)) return;
     errors.push(`console: ${m.text()}`);
@@ -198,8 +200,8 @@ async function runPass(browser, name, ctxOpts, { full }) {
       await page.waitForSelector('#ov-pause:not(.hidden)', { state: 'visible' });
       await page.click('#ov-pause [data-action="settings"]');
       await page.waitForSelector('#ov-settings:not(.hidden)', { state: 'visible' });
-      const qsel = await page.$eval('#ov-settings [data-setting-select="quality"]', (el) => el.value);
-      if (!['0', '1', '2'].includes(qsel)) throw new Error('settings quality select not bound: ' + qsel);
+      const qsel = await page.$eval('#gfx-preset', (el) => el.value);
+      if (!['auto', 'low', 'balanced', 'high', 'ultra'].includes(qsel)) throw new Error('graphics quality select not bound: ' + qsel);
       await page.click('[data-action="close-settings"]');
       await page.waitForSelector('#ov-settings.hidden', { state: 'attached' });
       await page.click('[data-action="resume"]');
@@ -302,6 +304,79 @@ async function runPass(browser, name, ctxOpts, { full }) {
   console.log(`ok - ${name}: no page errors`);
 }
 
+// -------- graphics settings pass (real visible controls) --------
+async function graphicsPass(browser, name, ctxOpts) {
+  const errors = [];
+  const context = await browser.newContext(ctxOpts);
+  const page = await context.newPage();
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
+    const url = m.location()?.url || '';
+    if (/Failed to load resource/.test(m.text()) && /\/api\/|\/favicon/.test(url)) return;
+    errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  const preset = () => page.evaluate(() => document.body.getAttribute('data-gfx-preset'));
+  const openSettingsFromTitle = async () => {
+    await page.click('#ov-title [data-action="settings"]');
+    await page.waitForSelector('#ov-settings:not(.hidden)', { state: 'visible' });
+    await page.locator('#gfx-preset').scrollIntoViewIfNeeded();
+  };
+  try {
+    await page.goto(BASE, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.body.hasAttribute('data-gfx-preset'), null, { timeout: 20000 });
+    const auto = await preset();
+    await openSettingsFromTitle();
+    const autoLabel = await page.$eval('#gfx-preset option[value="auto"]', (o) => o.textContent);
+    if (!/Auto \(detected: /.test(autoLabel)) throw new Error('auto label missing detected tier: ' + autoLabel);
+    ok(`${name}: graphics panel open, Auto resolves to "${auto}" ("${autoLabel}")`);
+
+    // Ultra, then play a moment at Ultra (no console noise allowed)
+    await page.selectOption('#gfx-preset', 'ultra');
+    if ((await preset()) !== 'ultra') throw new Error('ultra not applied');
+    await page.click('[data-action="close-settings"]');
+    await page.click('[data-action="play"]');
+    await page.waitForTimeout(800);
+    await page.click('#btn-pause');
+    await page.click('#ov-pause [data-action="settings"]');
+    await page.waitForSelector('#ov-settings:not(.hidden)', { state: 'visible' });
+    await page.locator('#gfx-preset').scrollIntoViewIfNeeded();
+    ok(`${name}: Ultra applied and rendered in-game`);
+
+    await page.selectOption('#gfx-preset', 'low');
+    if ((await preset()) !== 'low') throw new Error('low not applied');
+    const lowSummary = await page.textContent('#gfx-summary');
+    if (!/no shadows/.test(lowSummary)) throw new Error('low summary unexpected: ' + lowSummary);
+    ok(`${name}: Low applied ("${lowSummary.trim()}")`);
+
+    await page.selectOption('#gfx-preset', 'high');
+    if ((await preset()) !== 'high') throw new Error('high not applied');
+    const bloomDefault = await page.$eval('#gfx-bloom', (el) => el.value);
+    if (bloomDefault !== 'preset') throw new Error('preset did not clear overrides');
+    await page.locator('#gfx-bloom').scrollIntoViewIfNeeded();
+    await page.selectOption('#gfx-bloom', 'off');
+    const hiSummary = await page.textContent('#gfx-summary');
+    if (/bloom/.test(hiSummary)) throw new Error('bloom override not reflected: ' + hiSummary);
+    ok(`${name}: High + bloom override applied ("${hiSummary.trim()}")`);
+
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => document.body.hasAttribute('data-gfx-preset'), null, { timeout: 20000 });
+    if ((await preset()) !== 'high') throw new Error('preset did not survive reload: ' + (await preset()));
+    await openSettingsFromTitle();
+    const after = await page.evaluate(() => [document.getElementById('gfx-preset').value, document.getElementById('gfx-bloom').value]);
+    if (after[0] !== 'high' || after[1] !== 'off') throw new Error('settings not persisted: ' + after);
+    await page.screenshot({ path: SHOT('graphics', name) });
+    // the panel must fit: the Done button is reachable by scrolling inside the panel
+    await page.locator('[data-action="close-settings"]').scrollIntoViewIfNeeded();
+    await page.click('[data-action="close-settings"]');
+    await page.waitForSelector('#ov-title:not(.hidden)', { state: 'visible' });
+    ok(`${name}: graphics settings survive reload`);
+  } finally {
+    await context.close();
+  }
+  if (errors.length) throw new Error(`${name} graphics pass had page errors:\n  ${errors.join('\n  ')}`);
+}
+
 // ---------- main ----------
 let browser = null;
 try {
@@ -313,6 +388,8 @@ try {
   await runPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } }, { full: true });
   await runPass(browser, 'mobile',
     { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, { full: false });
+  await graphicsPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } });
+  await graphicsPass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   console.log('\nE2E PASS — sky-sling, desktop + mobile, no page errors');
 } catch (e) {
   failures++;

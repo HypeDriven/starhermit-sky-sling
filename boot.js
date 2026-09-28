@@ -57,12 +57,47 @@
   function setupRenderer() {
     var canvas = document.getElementById('gl-canvas');
     renderer = new SS.render.Renderer(canvas);
-    if (!renderer.init()) { UI.show('ov-compat'); return false; }
-    renderer.setTier(session.settings.quality);
-    renderer.setReducedMotion(session.settings.reducedMotion);
+    renderer.setReducedMotion(session.settings.reducedMotion || prefersReducedMotion());
+    if (!renderer.init(gfxSaved())) { UI.show('ov-compat'); return false; }
+    // scenic backdrop behind the title until a round starts
+    if (!session.level) renderer.buildLevel(C.getLevel(0));
+    if (gfxPanel) gfxPanel.refresh();
     window.addEventListener('resize', function () { renderer.resize(); });
     window.addEventListener('orientationchange', function () { setTimeout(function () { renderer.resize(); }, 60); });
     return true;
+  }
+
+  // ---- graphics settings (gfx.js model, gfxui.js panel) ----------------------------
+  var gfxPanel = null;
+  var gfxTimer = null;
+  function gfxSaved() {
+    var g = session.settings.graphics;
+    return g && typeof g === 'object' ? g : {};
+  }
+  function prefersReducedMotion() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
+  }
+  function mountGraphicsPanel() {
+    var host = document.getElementById('gfx-controls');
+    if (!host || !SS.gfxui) return;
+    gfxPanel = SS.gfxui.mount(host, {
+      get: gfxSaved,
+      set: function (saved) {
+        session.saveSettings({ graphics: saved });
+        if (renderer && renderer.ok) renderer.setGraphics(saved);
+      },
+      info: function () { return renderer && renderer.ok ? renderer.graphicsInfo() : null; }
+    });
+  }
+  // keep the summary (pixels, fps) current while the settings panel is open
+  function watchGraphicsPanel(open) {
+    if (gfxTimer) { clearInterval(gfxTimer); gfxTimer = null; }
+    if (!open || !gfxPanel) return;
+    gfxPanel.refresh();
+    gfxTimer = setInterval(function () {
+      if (!UI.visible('ov-settings')) { clearInterval(gfxTimer); gfxTimer = null; return; }
+      gfxPanel.refresh();
+    }, 1000);
   }
 
   function waitForTHREE(cb, tries) {
@@ -91,7 +126,9 @@
   }
 
   // ---- round start ---------------------------------------------------------------------
+  var pendingRound = null;   // a round requested before the renderer was ready
   function startRound(mode, ref) {
+    if (!renderer || !renderer.ok) { pendingRound = [mode, ref]; return; }
     var res = session.startRound(mode, ref);
     if (!res.ok) { UI.showError(res.reason); return; }
     lastLaunchCmd = null;
@@ -163,7 +200,7 @@
       UI.show('ov-level-select');
     },
     challenge: function () { A.unlock(); A.play('ui'); startRound('challenge', 12); },
-    settings: function () { A.play('ui'); UI.show('ov-settings'); },
+    settings: function () { A.play('ui'); UI.show('ov-settings'); watchGraphicsPanel(true); },
     'close-settings': function () { A.play('ui'); UI.show(overlayForScreen()); },
     help: function () { A.play('ui'); UI.show('ov-help'); },
     'close-help': function () { A.play('ui'); UI.show(overlayForScreen()); },
@@ -320,8 +357,16 @@
       if (evt.type === 'sim') {
         var s = evt.sim;
         if (s.type === 'impact') { A.play('impact'); renderer.spawnImpact(session.state.bird.x, session.state.bird.y, false); }
-        else if (s.type === 'block-down') { A.play(s.mat === 'stone' ? 'stone' : 'wood'); renderer.spawnImpact(session.state.bird.x, session.state.bird.y, true); }
-        else if (s.type === 'target-down') { A.play('target'); UI.announce('Target down!'); }
+        else if (s.type === 'block-down') {
+          A.play(s.mat === 'stone' ? 'stone' : 'wood');
+          var blk = findById(session.state.blocks, s.id) || session.state.bird;
+          renderer.spawnImpact(blk.x, blk.y, true, s.mat, 'block');
+        }
+        else if (s.type === 'target-down') {
+          A.play('target'); UI.announce('Target down!');
+          var tg = findById(session.state.targets, s.id);
+          if (tg) renderer.spawnImpact(tg.x, tg.y, true, null, 'pop');
+        }
         else if (s.type === 'win') A.play('win');
         else if (s.type === 'lose') A.play('lose');
       } else if (evt.type === 'results') {
@@ -335,6 +380,11 @@
         UI.show(null);
       }
     });
+  }
+
+  function findById(list, id) {
+    for (var i = 0; i < (list || []).length; i++) if (list[i].id === id) return list[i];
+    return null;
   }
 
   function onResults(result) {
@@ -414,8 +464,7 @@
       // rebuild GPU resources from retained CPU descriptors
       if (session.level) {
         renderer.ok = false;
-        if (renderer.init()) {
-          renderer.setTier(session.settings.quality);
+        if (renderer.init(gfxSaved())) {
           renderer.buildLevel(session.level);
           renderer.sync(session.state);
         }
@@ -432,8 +481,7 @@
     A.setLevel('voice', s.voice);
     UI.applyA11yClasses(s);
     if (renderer && renderer.ok) {
-      renderer.setTier(s.quality);
-      renderer.setReducedMotion(s.reducedMotion);
+      renderer.setReducedMotion(s.reducedMotion || prefersReducedMotion());
     }
   }
 
@@ -455,6 +503,7 @@
     });
     A.setCaptionHandler(UI.caption);
     applySettings();
+    mountGraphicsPanel();
     waitForTHREE(function (hasTHREE) {
       if (!hasTHREE || !setupRenderer()) { UI.show('ov-compat'); return; }
       // remote-preferred progress: adopt the cloud doc (on conflict) once ready
@@ -462,8 +511,9 @@
         if (doc && session.adoptProgress(doc) && session.screen === 'title') toTitle();
       });
       toTitle();
+      if (pendingRound) { var pr = pendingRound; pendingRound = null; startRound(pr[0], pr[1]); }
       requestAnimationFrame(loop);
-    }, 30);
+    }, 100);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

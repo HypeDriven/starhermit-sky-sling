@@ -187,3 +187,34 @@ body.reduced-motion * { transition: none !important; animation: none !important;
 /* Left-handed: swap rails */
 body.left-handed #rail-left { left: auto; right: calc(10px + var(--safe-right)); }
 body.left-handed #rail-right { right: auto; left: calc(10px + var(--safe-left)); text-align: left; }
+
+/* ---- Graphics settings section ------------------------------------------ */
+#ov-settings select {
+  font: inherit; color: var(--panel-fg); background: var(--btn-bg);
+  border: 1px solid rgba(255,255,255,0.25); border-radius: 8px;
+  min-height: 44px; padding: 6px 8px; max-width: 100%;
+}
+#gfx-controls .gfx-row { flex-wrap: wrap; row-gap: 4px; }
+#gfx-controls .gfx-label { flex: 1 1 9em; min-width: 0; }
+#gfx-controls .gfx-control { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: nowrap; }
+#gfx-controls .gfx-control select { width: 13.5em; }
+#gfx-controls .gfx-control input[type=range] { width: 9em; max-width: 60vw; flex: 0 1 auto; }
+#gfx-controls .gfx-scale-value { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+#gfx-controls .gfx-check { justify-content: flex-start; }
+#gfx-controls .gfx-check input { width: 22px; height: 22px; margin: 0; flex: none; }
+#gfx-controls .gfx-summary { margin: 6px 4px; line-height: 1.4; overflow-wrap: anywhere; }
+#gfx-controls .gfx-note { margin: 6px 4px; font-size: 0.85em; }
+@media (max-width: 480px) {
+  #ov-settings.panel { padding: 16px 14px; }
+  #ov-settings fieldset { padding: 6px 8px; margin: 8px 0; }
+  #gfx-controls .gfx-control { flex: 1 1 100%; }
+  #gfx-controls .gfx-control select { width: 100%; }
+  #gfx-controls .gfx-control input[type=range] { flex: 1 1 auto; width: auto; max-width: none; }
+}
+
+/* frame-rate readout: top centre over the sky, never over HUD controls */
+#fps-meter {
+  position: fixed; top: calc(60px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  z-index: 30; pointer-events: none; padding: 2px 8px; border-radius: 6px;
+  background: rgba(0,0,0,0.45); color: #fff; font: 12px/1.4 ui-monospace, monospace;
+}
