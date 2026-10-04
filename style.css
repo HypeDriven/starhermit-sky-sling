@@ -218,3 +218,6 @@ body.left-handed #rail-right { right: auto; left: calc(10px + var(--safe-left));
   z-index: 30; pointer-events: none; padding: 2px 8px; border-radius: 6px;
   background: rgba(0,0,0,0.45); color: #fff; font: 12px/1.4 ui-monospace, monospace;
 }
+#btn-signin[hidden], #btn-invite[hidden], .sh-toast[hidden] { display: none !important; }
+.panel .row:has(> #btn-signin):not(:has(> button:not([hidden]))) { display: none; }
+.sh-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: min(92vw, 520px); margin: 0; padding: 10px 16px; border-radius: 10px; background: rgba(16, 28, 44, .94); color: #f2f6fb; font-size: 14px; text-align: center; overflow-wrap: anywhere; box-shadow: 0 6px 20px rgba(0,0,0,.35); }

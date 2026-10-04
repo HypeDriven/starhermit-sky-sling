@@ -317,8 +317,8 @@
   function wireKeyboard() {
     document.addEventListener('keydown', function (e) {
       if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-      var k = e.key;
-      if (k === 'Escape' || k === 'p' || k === 'P') {
+      var k = platform.actionFor(e.code);
+      if (k === 'pause') {
         if (session.screen === 'paused') { actions.resume(); }
         else if (session.screen === 'active' || session.screen === 'resolving') {
           session.pause(); UI.show('ov-pause');
@@ -327,27 +327,27 @@
       }
       // fast-forward is only meaningful while a shot is resolving, so it has to
       // be handled before the aim-phase guard below
-      if (k === 's' || k === 'S') {
+      if (k === 'skip') {
         if (session.screen === 'resolving') { document.getElementById('btn-skip').click(); e.preventDefault(); }
         return;
       }
       if (session.screen !== 'active') return;
-      if (k === 'r' || k === 'R') { actions.restart(); e.preventDefault(); return; }
-      if (k === 'u' || k === 'U') { document.getElementById('btn-undo').click(); e.preventDefault(); return; }
+      if (k === 'restart') { actions.restart(); e.preventDefault(); return; }
+      if (k === 'undo') { document.getElementById('btn-undo').click(); e.preventDefault(); return; }
       if (!session.legal().canLaunch) return;
       var step = session.settings.timingAssist ? 0.25 : 0.5;
-      if (k === 'ArrowLeft')  { kbAim.vx = Math.max(1, kbAim.vx - step); kbAim.active = true; }
-      else if (k === 'ArrowRight') { kbAim.vx = Math.min(R.MAX_SPEED * 0.9, kbAim.vx + step); kbAim.active = true; }
-      else if (k === 'ArrowUp')   { kbAim.vy = Math.min(R.MAX_SPEED * 0.9, kbAim.vy + step); kbAim.active = true; }
-      else if (k === 'ArrowDown') { kbAim.vy = Math.max(-4, kbAim.vy - step); kbAim.active = true; }
-      else if (k === ' ' || k === 'Enter') {
+      if (k === 'aimLeft')  { kbAim.vx = Math.max(1, kbAim.vx - step); kbAim.active = true; }
+      else if (k === 'aimRight') { kbAim.vx = Math.min(R.MAX_SPEED * 0.9, kbAim.vx + step); kbAim.active = true; }
+      else if (k === 'aimUp')   { kbAim.vy = Math.min(R.MAX_SPEED * 0.9, kbAim.vy + step); kbAim.active = true; }
+      else if (k === 'aimDown') { kbAim.vy = Math.max(-4, kbAim.vy - step); kbAim.active = true; }
+      else if (k === 'launch') {
         if (kbAim.active) { doLaunch(kbAim.vx, kbAim.vy); kbAim.active = false; }
         e.preventDefault(); return;
       } else return;
       e.preventDefault();
       // preview keyboard aim as a pull vector
       renderer.showAim(-kbAim.vx / R.LAUNCH_POWER, -kbAim.vy / R.LAUNCH_POWER);
-      UI.setHUD({ hintText: 'Aim: vx ' + kbAim.vx.toFixed(1) + ', vy ' + kbAim.vy.toFixed(1) + ' — Space to launch' });
+      UI.setHUD({ hintText: 'Aim: vx ' + kbAim.vx.toFixed(1) + ', vy ' + kbAim.vy.toFixed(1) + ' — ' + platform.keyLabel('launch') + ' to launch' });
     });
   }
 
@@ -374,6 +374,8 @@
       } else if (evt.type === 'achievement') {
         var meta = SS.session.ACHIEVEMENTS.filter(function (a) { return a.key === evt.key; })[0];
         if (meta) { UI.showAchievement(meta.name); UI.announce('Achievement unlocked: ' + meta.name); }
+      } else if (evt.type === 'settings') {
+        if (!applyingRemoteSettings) platform.pushSettings(evt.settings); // platform settings KV mirror
       } else if (evt.type === 'progress') {
         platform.scheduleCloudSave(session.progress); // debounced cloud mirror
       } else if (evt.type === 'screen' && (evt.to === 'active')) {
@@ -485,12 +487,71 @@
     }
   }
 
+  // ---- StarHermit account controls + platform preferences --------------------------------------------
+  var applyingRemoteSettings = false;
+  function wireAccount() {
+    var L = SS.shStrings.strings(navigator.language);
+    var bIn = document.getElementById('btn-signin'), bInv = document.getElementById('btn-invite');
+    bIn.textContent = L.signIn;
+    bInv.textContent = L.invite;
+    bIn.addEventListener('click', function () { platform.signIn(); });
+    bInv.addEventListener('click', function () {
+      var link = platform.inviteLink();
+      if (!link) return;
+      var done = function () { UI.toast(L.copied); };
+      var fail = function () { UI.toast(L.copyFailed + ': ' + link); };
+      try { navigator.clipboard.writeText(link).then(done, fail); } catch (_) { fail(); }
+    });
+    platform.onSignedOut = function () {
+      UI.setProfileName(null);
+      refreshAccount();
+      UI.toast(L.signedOut);
+    };
+    refreshAccount();
+  }
+  function refreshAccount() {
+    document.getElementById('btn-signin').hidden = !platform.canSignIn();
+    document.getElementById('btn-invite').hidden = !platform.inviteLink();
+  }
+  function renderKeyHelp() {
+    var el = document.getElementById('help-keys');
+    if (!el) return;
+    var k = platform.keyLabel;
+    el.innerHTML = '';
+    [[k('aimLeft') + k('aimRight') + k('aimUp') + k('aimDown'), ' aim, '], [k('launch'), ' launch, '],
+      [k('pause'), ' pause, '], [k('restart'), ' restart, '], [k('undo'), ' undo in practice, '],
+      [k('skip'), ' fast-forward.']].forEach(function (p) {
+      var kbd = document.createElement('kbd');
+      kbd.textContent = p[0];
+      el.appendChild(kbd);
+      el.appendChild(document.createTextNode(p[1]));
+    });
+  }
+  // Signed in: platform settings win over local ones, then the player's key bindings.
+  function loadPlatformPrefs() {
+    if (!platform.hosted) return;
+    platform.loadSettings().then(function (remote) {
+      if (!Object.keys(remote).length) return;
+      applyingRemoteSettings = true;
+      session.saveSettings(remote);
+      applyingRemoteSettings = false;
+      UI.refreshSettings(session.settings);
+      applySettings();
+      if (renderer && renderer.ok) renderer.setGraphics(gfxSaved());
+      if (gfxPanel) gfxPanel.refresh();
+    });
+    platform.loadControls().then(renderKeyHelp);
+  }
+
   // ---- boot -----------------------------------------------------------------------------------------------
   function boot() {
     UI.init(actions);
     // hosted iff a launch token was read (fragment, stripped; query = local dev)
     platform.init();
     platform.onSyncStatus = function (status) { UI.setSyncStatus(status); };
+    wireAccount();
+    renderKeyHelp();
+    loadPlatformPrefs();
     platform.loadProfile().then(function () {
       UI.setProfileName(platform.nickname); // null in local play → slot stays hidden
       UI.setSyncStatus(platform.syncStatus);

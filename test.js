@@ -287,28 +287,7 @@ test('session: save document checksum catches corruption', function () {
 });
 
 // ---- platform integration ---------------------------------------------------------------
-var P = require('./platform');
-
-test('platform: stored-zip round-trips payload and base64', function () {
-  var zip = P._zip;
-  var payload = new TextEncoder().encode(JSON.stringify({ hello: 'sky-sling', n: 42 }));
-  var zipped = zip.zipStore('skysling-progress.json', payload);
-  var back = zip.unzipFirstEntry(zipped);
-  assert.deepStrictEqual(Array.from(back), Array.from(payload));
-  assert.strictEqual(new TextDecoder().decode(back), '{"hello":"sky-sling","n":42}');
-  var b64 = zip.bytesToBase64(zipped);
-  assert.deepStrictEqual(Array.from(zip.base64ToBytes(b64)), Array.from(zipped));
-});
-
-test('platform: hosted is false without a launch token (node has no location)', function () {
-  assert.strictEqual(P.hosted, false);
-  assert.strictEqual(P.token, null);
-  // local play: cloud ops are no-ops, sync stays offline, never throws
-  return P.loadCloud().then(function (d) {
-    assert.strictEqual(d, null);
-    assert.strictEqual(P.syncStatus, 'offline');
-  });
-});
+// (platform adapter tests live in tests/platform.test.js)
 
 test('session: progress save emits event for the cloud mirror', function () {
   var sess = new S.Session();

@@ -203,6 +203,23 @@
     });
   }
 
+  // Re-sync the settings controls after settings changed outside the panel.
+  function refreshSettings(settings) {
+    document.querySelectorAll('[data-setting-range]').forEach(function (el) { el.value = settings[el.getAttribute('data-setting-range')]; });
+    document.querySelectorAll('[data-setting-check]').forEach(function (el) { el.checked = !!settings[el.getAttribute('data-setting-check')]; });
+    document.querySelectorAll('[data-setting-select]').forEach(function (el) { el.value = String(settings[el.getAttribute('data-setting-select')]); });
+  }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $('sh-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, 3200);
+  }
+
   function applyA11yClasses(settings) {
     document.body.classList.toggle('reduced-motion', !!settings.reducedMotion);
     document.body.classList.toggle('high-contrast', !!settings.highContrast);
@@ -230,7 +247,7 @@
     setHUD: setHUD, announce: announce, alert: alert, caption: caption,
     setProfileName: setProfileName, setSyncStatus: setSyncStatus, showBoard: showBoard,
     mirrorBoard: mirrorBoard, showResults: showResults, showAchievement: showAchievement,
-    buildLevelGrid: buildLevelGrid, bindSettings: bindSettings,
+    buildLevelGrid: buildLevelGrid, bindSettings: bindSettings, refreshSettings: refreshSettings, toast: toast,
     applyA11yClasses: applyA11yClasses, showError: showError,
     showCountdown: showCountdown, setUndoEnabled: setUndoEnabled
   };
