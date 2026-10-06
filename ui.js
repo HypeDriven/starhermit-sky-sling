@@ -42,7 +42,10 @@
       _lastFocus = document.activeElement;
       var panel = $(id);
       var focusable = panel && panel.querySelector('button, [href], input, select, [tabindex]');
-      if (focusable) setTimeout(function () { focusable.focus(); }, 0);
+      // open at the top: focusing a bottom button (Close) would scroll a tall
+      // panel past its heading on phones and zoomed large screens.
+      if (panel) panel.scrollTop = 0;
+      if (focusable) setTimeout(function () { focusable.focus({ preventScroll: true }); if (panel) panel.scrollTop = 0; }, 0);
     } else if (_lastFocus && document.contains(_lastFocus) && _lastFocus.offsetParent) {
       // only restore focus to a control that is still on screen, and only once:
       // hiding overlays happens on every settled shot, and re-focusing a stale
