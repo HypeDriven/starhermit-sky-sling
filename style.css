@@ -57,6 +57,8 @@ body {
 #hud-title { font-size: 1.1rem; margin: 0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 #hud-mode { color: var(--accent-2); font-size: 0.85rem; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
 #player-name, #sync-status { font-size: 0.8rem; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+/* status chips sit over the bright sky: give them a dark backing */
+#hud-mode:not(:empty), #player-name, #sync-status { background: rgba(12, 22, 34, 0.6); padding: 3px 8px; border-radius: 6px; }
 #res-board { margin: 0.4em 0; }
 #res-board h3 { margin: 0.3em 0; font-size: 0.95rem; }
 #res-board ol { margin: 0; padding-left: 1.6em; max-height: 9em; overflow-y: auto; }
@@ -94,11 +96,13 @@ button.primary:hover { filter: brightness(1.1); }
 .panel {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   background: var(--panel-bg); border-radius: 14px; padding: 24px 28px;
-  min-width: 280px; max-width: min(92vw, 560px); max-height: 88vh; overflow: auto;
+  min-width: 280px; max-width: min(calc(92vw / var(--ui-scale, 1)), 560px); max-height: calc(88vh / var(--ui-scale, 1)); overflow: auto;
   pointer-events: auto; text-align: center;
   box-shadow: 0 12px 40px rgba(0,0,0,0.5);
 }
-.panel.wide { max-width: min(94vw, 720px); }
+.panel.wide { max-width: min(calc(94vw / var(--ui-scale, 1)), 720px); }
+/* the stage grid is auto-fill: give the panel a real width or it shrinks to 3 columns */
+#ov-level-select { width: min(calc(94vw / var(--ui-scale, 1)), 720px); }
 .panel h1 { margin: 0 0 6px; font-size: 2.2rem; color: var(--accent-2); }
 .panel h2 { margin-top: 0; color: var(--accent-2); }
 .panel .sub { color: var(--dim); margin-top: 0; max-width: 70ch; }
@@ -128,6 +132,7 @@ kbd { background: #111; border: 1px solid #555; border-radius: 4px; padding: 0 5
 #res-breakdown { margin: 8px auto; border-collapse: collapse; }
 #res-breakdown td { padding: 3px 12px; text-align: left; }
 #res-breakdown td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+#res-ranked:empty, #res-achievement:empty { display: none; }
 #res-stars { font-size: 1.6rem; color: var(--accent-2); margin: 4px 0; letter-spacing: 0.2em; }
 
 #countdown {
@@ -143,31 +148,39 @@ kbd { background: #111; border: 1px solid #555; border-radius: 4px; padding: 0 5
   aside { top: auto; bottom: 72px; max-width: 24ch; padding: 8px 10px; font-size: 0.85rem; }
   #rail-left { left: calc(8px + var(--safe-left)); }
   #rail-right { right: calc(8px + var(--safe-right)); }
-  aside .divider, #hud-hint { display: none; }
+  aside .divider, #hud-hint, #hud-hint-heading { display: none; }
 }
 
 /* Portrait mobile: status top, square-ish playfield, thumb-zone bottom tray */
 @media (max-width: 640px) and (orientation: portrait) {
   aside { position: static; }
-  #rail-left, #rail-right { display: inline-block; margin: 4px; vertical-align: top; }
-  #game-region { display: flex; flex-direction: column; }
+  /* rails side by side under the playfield (a column of two half-width
+     cards wasted half the screen and squeezed the playfield) */
+  #game-region { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; }
+  #rail-left, #rail-right { margin: 4px; max-width: none; }
+  #top-bar, #gl-canvas, #bottom-bar { grid-column: 1 / -1; }
+  #top-bar { grid-row: 1; } #gl-canvas { grid-row: 2; } #bottom-bar { grid-row: 4; }
+  #rail-left { grid-row: 3; grid-column: 1; } #rail-right { grid-row: 3; grid-column: 2; }
+  body.left-handed #rail-left { grid-column: 2; } body.left-handed #rail-right { grid-column: 1; }
   /* min-height/min-width: 0 let the canvas shrink below its drawing-buffer
      intrinsic size so the column fits the viewport height. */
   #gl-canvas { position: relative; flex: 1; min-height: 0; min-width: 0; }
   #top-bar { position: relative; padding-top: calc(6px + var(--safe-top)); background: var(--panel-bg); }
   #bottom-bar { position: relative; padding-bottom: calc(10px + var(--safe-bottom)); background: var(--panel-bg); }
-  /* The canvas comes first in the DOM (it is the labelled region's content), so
-     the flex column needs explicit ordering to keep the title bar on top. */
-  #top-bar { order: 0; }
-  #gl-canvas { order: 1; }
-  #rail-left, #rail-right { order: 2; }
-  #bottom-bar { order: 3; }
 }
 
 /* Landscape mobile: narrow rails, keep 44px targets */
 @media (max-height: 500px) and (orientation: landscape) {
-  aside { top: 56px; font-size: 0.8rem; padding: 6px 8px; max-width: 20ch; }
-  .panel { padding: 14px 18px; max-height: 92vh; }
+  aside { top: 56px; bottom: auto; font-size: 0.8rem; padding: 6px 8px; max-width: 20ch; }
+  /* title menu: keep every button inside the panel without scrolling */
+  .panel h1 { font-size: 1.6rem; margin-bottom: 2px; }
+  .panel .sub { margin-bottom: 6px; }
+  .panel .row { margin-top: 6px; }
+  .panel button { margin-top: 6px; }
+  .panel h2 { margin: 0 0 4px; }
+  .panel .big, #res-stars { margin: 0; }
+  #res-achievement { margin: 4px 0; }
+  .panel { padding: 14px 18px; max-height: calc(92vh / var(--ui-scale, 1)); }
 }
 
 /* High contrast mode */
@@ -198,7 +211,7 @@ body.left-handed #rail-right { right: auto; left: calc(10px + var(--safe-left));
 #gfx-controls .gfx-label { flex: 1 1 9em; min-width: 0; }
 #gfx-controls .gfx-control { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: nowrap; }
 #gfx-controls .gfx-control select { width: 13.5em; }
-#gfx-controls .gfx-control input[type=range] { width: 9em; max-width: 60vw; flex: 0 1 auto; }
+#gfx-controls .gfx-control input[type=range] { width: 9em; max-width: calc(60vw / var(--ui-scale, 1)); flex: 0 1 auto; }
 #gfx-controls .gfx-scale-value { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
 #gfx-controls .gfx-check { justify-content: flex-start; }
 #gfx-controls .gfx-check input { width: 22px; height: 22px; margin: 0; flex: none; }
@@ -220,4 +233,9 @@ body.left-handed #rail-right { right: auto; left: calc(10px + var(--safe-left));
 }
 #btn-signin[hidden], #btn-invite[hidden], .sh-toast[hidden] { display: none !important; }
 .panel .row:has(> #btn-signin):not(:has(> button:not([hidden]))) { display: none; }
-.sh-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: min(92vw, 520px); margin: 0; padding: 10px 16px; border-radius: 10px; background: rgba(16, 28, 44, .94); color: #f2f6fb; font-size: 14px; text-align: center; overflow-wrap: anywhere; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+.sh-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; max-width: min(calc(92vw / var(--ui-scale, 1)), 520px); margin: 0; padding: 10px 16px; border-radius: 10px; background: rgba(16, 28, 44, .94); color: #f2f6fb; font-size: 14px; text-align: center; overflow-wrap: anywhere; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+
+/* ---- large screens: shared ui-scale.js sets --ui-scale (1 up to 1600x1000).
+   Each DOM layer above the unzoomed full-viewport 3D canvas is zoomed once;
+   vw/vh lengths inside them are divided by the scale. */
+#top-bar, #bottom-bar, aside, #overlay-root, .sh-toast, #fps-meter { zoom: var(--ui-scale, 1); }
