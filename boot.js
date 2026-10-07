@@ -19,19 +19,25 @@
   // keyboard aim state (velocity vector adjusted by arrows)
   var kbAim = { active: false, vx: 9, vy: 7 };
 
-  // ---- hosted daily board (read-only; clients can never submit scores) -------------
-  function showHostedDailyBoard(myScore) {
+  // ---- hosted leaderboard: post the run, show the rank, then the top ten ---------
+  var lbSeq = 0;
+  function postToLeaderboard(total) {
+    var line = document.getElementById('res-lb');
+    var T = SS.shStrings.strings(navigator.language);
+    var seq = ++lbSeq;
+    line.textContent = T.lbPosting;
+    line.classList.remove('hidden');
+    platform.submitPlatformScore(total).then(function (r) {
+      if (seq !== lbSeq) return;
+      line.textContent = !r.posted ? T.lbNotPosted
+        : r.rank ? T.lbRank.replace('{rank}', r.rank) : T.lbPosted;
+      showHostedBoard();
+    });
+  }
+  function showHostedBoard() {
     UI.showBoard(null);
     platform.leaderboardInfo().then(function (info) {
-      var note = 'Daily board is platform-owned — read-only. Your score: ' + myScore + '.';
-      if (!info || !info.leaderboardId) {
-        document.getElementById('res-ranked').textContent = note + ' No board for this game yet.';
-        return null;
-      }
-      if (info.me && typeof info.me.score === 'number') {
-        note += ' Board best: ' + info.me.score + '.';
-      }
-      document.getElementById('res-ranked').textContent = note;
+      if (!info || !info.leaderboardId) return null;
       return platform.leaderboardEntries(info.leaderboardId, { page: 0, pageSize: 10 });
     }).then(function (list) {
       if (!list) return;
@@ -398,13 +404,16 @@
       stars = session.progress.stars[session.level.index] || 1;
     }
     var note = '';
-    if (result.ranked) {
+    lbSeq++;
+    document.getElementById('res-lb').classList.add('hidden');
+    if (platform.hosted && /^(journey|daily|challenge)$/.test(session.mode)) {
+      // Signed in: post the run to the platform high-score board (score-script.js).
+      UI.showResults(result, stars, '');
+      postToLeaderboard(result.score.total);
+    } else if (result.ranked) {
       var envelope = session.finishEnvelope();
       if (platform.hosted) {
-        // platform leaderboard is read-only; scores can never be client-submitted
-        note = 'Daily board is platform-owned — read-only. Your score: ' + result.score.total + '.';
-        UI.showResults(result, stars, note);
-        showHostedDailyBoard(result.score.total);
+        UI.showResults(result, stars, '');
       } else {
         note = 'Submitting to daily board…';
         UI.showResults(result, stars, note);

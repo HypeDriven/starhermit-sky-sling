@@ -173,7 +173,7 @@ The Settings panel's **Graphics** section offers: Quality (Auto — chosen from 
 - `ui`: responsive DOM shell, focus, localization, settings, overlays, accessibility mirror.
 - `audio`: buses, event mapping, focus/background behavior, decode and memory policy.
 - `content`: versioned levels, themes, tutorials, validation metadata.
-- `platform`: launch-token REST adapter — fragment token read/strip, 45-min launch-token refresh, profile fetch, cloud-save mirror, read-only leaderboard, offline-tolerant its-backend calls.
+- `platform`: launch-token REST adapter — fragment token read/strip, 45-min launch-token refresh, profile fetch, cloud-save mirror, leaderboard post (`submitPlatformScore`) and read, offline-tolerant its-backend calls.
 
 No module may mutate rules state except through a validated command. Rendering consumes immutable snapshots plus interpolation data. UI state and simulation state are separate so closing a drawer cannot affect a match.
 
@@ -197,7 +197,7 @@ No module may mutate rules state except through a validated command. Rendering c
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Sky Sling`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
 - `starhermit-sdk.js` (unmodified copy of the canonical StarHermit SDK) loads before `platform.js`, and `StarHermit.init()` runs inline at page load: it reads `#game_token=` (library launch) or `#access_token=` (sign-in return), strips it, takes the slug from the `game_scope` claim and renews the launch token before expiry. `platform.js` is a thin adapter over `window.StarHermit`; if renewal is refused the game shows a localized notice, re-offers sign-in and keeps playing locally. Without a token it makes no platform calls; tokens are never persisted.
-- Daily mode derives its seed from the UTC date, so it is shared by construction; when running against the game's own server.js (local dev), `GET /api/v1/time` / `/api/v1/daily` confirm the shared seed and server-time offset, and ranked scores are submitted there as replay-validated claims. On the platform host those routes do not exist: the daily runs on the local clock and the daily board is read-only (clients can never submit; `StarHermit.leaderboards()` + `leaderboardEntries()`, names resolved to profile nicknames).
+- Daily mode derives its seed from the UTC date, so it is shared by construction; when running against the game's own server.js (local dev), `GET /api/v1/time` / `/api/v1/daily` confirm the shared seed and server-time offset, and ranked scores are submitted there as replay-validated claims. On the platform host those routes do not exist: the daily runs on the local clock. Signed in, every finished Journey, Daily or Challenge run (not Learn or Practice) posts its total through `StarHermit.submitScores` — a practice session whose platform script `score-script.js` (canonical copy in the games repo's `tools/score-script.js`) range-checks it and posts it to the `high-score` board (integer, higher is better, 0–100,000). The results screen's `#res-lb` line shows "Leaderboard rank: #N" (or posted / not posted; localized in the nine locales in `sh-strings.js`), followed by the board's top ten (`StarHermit.leaderboards()` + `leaderboardEntries()`, names resolved to profile nicknames).
 
 ### Identity, profile, presence, and preferences
 - Guests play locally. On `*.starhermit.com` without a token the title shows **Sign in with StarHermit** (`StarHermit.signIn()`), hidden when signed in or running locally. Signed-in players see their profile nickname (fallback `Player <id prefix>`) in the top bar, and the title has an **Invite a friend** button that copies `StarHermit.inviteLink()` with a toast. These controls are localized in all 9 locales (`sh-strings.js`). No presence heartbeats are sent (none exist for launch tokens).
@@ -221,7 +221,7 @@ No module may mutate rules state except through a validated command. Rendering c
 - Realtime rooms, peer relay, matchmaking, backfill, and voice are intentionally not used because they add no value to this ruleset.
 
 ### Publishing and operations
-- Keep the authoritative script inside the distribution and declare it with `server=server.js`. Choose a digest-pinned container only if profiling proves the sandbox unsuitable; no initial design here requires one.
+- `starhermit.txt` declares `server=score-script.js` (the leaderboard platform script); `server.js` stays in the distribution as the local dev server. Choose a digest-pinned container only if profiling proves the sandbox unsuitable; no initial design here requires one.
 - Define control defaults, achievement metadata, and versioned settings before release. Publish immutable build assets, verify the launch path, maintain migration tests for saves, and expose no secret configuration to the client.
 - Capture anonymous funnel events only for start, tutorial step, round end, retry, settings change, and error category. Avoid raw text, precise personal data, and cross-title tracking.
 

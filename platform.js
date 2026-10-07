@@ -125,7 +125,7 @@
     }).join('/');
   }
 
-  // ---- leaderboards (read-only; clients never submit scores) ----
+  // ---- leaderboard reads ----
   function leaderboardInfo() {
     if (!platform.hosted) return Promise.resolve(null);
     return SH().leaderboards().then(function (boards) {
@@ -139,6 +139,21 @@
       page: ((opts && opts.page) || 0) + 1, pageSize: (opts && opts.pageSize) || 50
     }).then(function (r) { return { entries: (r && r.items) || [] }; }, function () { return null; });
   }
+
+  // ---- platform leaderboard post (hosted only) ----
+  // Posts a finished run's total through the game's score script
+  // (score-script.js) to the high-score board; resolves { posted, rank }.
+  platform.submitPlatformScore = function (total) {
+    if (!platform.hosted) return Promise.resolve({ posted: false, rank: null });
+    var sh = SH();
+    return sh.submitScores({ 'high-score': total }).then(function (keys) {
+      if (keys.indexOf('high-score') < 0) return { posted: false, rank: null };
+      return sh.leaderboard('high-score', { pageSize: 100 }).then(function (r) {
+        var me = ((r && r.items) || []).filter(function (i) { return i.userId === sh.userId; })[0];
+        return { posted: true, rank: me ? me.rank : null };
+      }, function () { return { posted: true, rank: null }; });
+    });
+  };
 
   // ---- its-backend (the game's own server.js) — local dev only ----
   // On the platform host these routes do not exist; hosted mode never calls them.
@@ -157,7 +172,7 @@
   };
   platform.submitScore = function (payload) {
     if (platform.hosted) {
-      // Platform leaderboards are script/elo-owned: clients can never submit.
+      // Hosted runs post through submitPlatformScore (score-script.js) instead.
       return Promise.resolve({ ok: false, error: 'client-submit-disabled' });
     }
     return fetch('/api/v1/scores', {

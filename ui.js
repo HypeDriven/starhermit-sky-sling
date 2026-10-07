@@ -101,7 +101,7 @@
     el.hidden = !label;
   }
 
-  // Read-only platform board on the results screen: rows = [{rank, nickname, score,
+  // Platform high-score board on the results screen: rows = [{rank, nickname, score,
   // userId}]; meId highlights the signed-in player's row. null clears.
   function showBoard(rows, meId) {
     var el = $('res-board');
@@ -109,7 +109,7 @@
     el.innerHTML = '';
     if (!rows || !rows.length) { el.classList.add('hidden'); return; }
     var h = document.createElement('h3');
-    h.textContent = 'Daily board (top ' + rows.length + ')';
+    h.textContent = 'Leaderboard (top ' + rows.length + ')';
     var ol = document.createElement('ol');
     rows.forEach(function (e, i) {
       var li = document.createElement('li');
