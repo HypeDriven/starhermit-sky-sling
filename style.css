@@ -61,7 +61,7 @@ body {
 #hud-mode:not(:empty), #player-name, #sync-status { background: rgba(12, 22, 34, 0.6); padding: 3px 8px; border-radius: 6px; }
 #res-board { margin: 0.4em 0; }
 #res-board h3 { margin: 0.3em 0; font-size: 0.95rem; }
-#res-board ol { margin: 0; padding-left: 1.6em; max-height: 9em; overflow-y: auto; }
+#res-board ol { margin: 0; padding-left: 0; list-style: none; max-height: 9em; overflow-y: auto; }
 #res-board li.me { color: var(--accent-2); font-weight: 700; }
 #hint-text { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); font-size: 0.9rem; }
 
