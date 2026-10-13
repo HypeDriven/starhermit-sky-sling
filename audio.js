@@ -53,7 +53,7 @@
         var g = _ctx.createGain();
         g.gain.value = _levels[name];
         g.connect(_ctx.destination);
-        _buses[name] = g;
+        _buses[name] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, name) : g);
       });
       _startAmbience();
       _startMusic();
@@ -64,12 +64,12 @@
   function _startAmbience() {
     // soft sea-wind: filtered noise-ish detuned sines, very quiet
     var g = _ctx.createGain(); g.gain.value = 1;
-    var o1 = _ctx.createOscillator(); o1.type = 'sine'; o1.frequency.value = 82;
-    var o2 = _ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 83.7;
+    var o1 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(_ctx.createOscillator(), null) : _ctx.createOscillator()); o1.type = 'sine'; o1.frequency.value = 82;
+    var o2 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(_ctx.createOscillator(), null) : _ctx.createOscillator()); o2.type = 'sine'; o2.frequency.value = 83.7;
     var og = _ctx.createGain(); og.gain.value = 0.06;
     o1.connect(og); o2.connect(og); og.connect(g);
     // slow swell LFO
-    var lfo = _ctx.createOscillator(); lfo.frequency.value = 0.13;
+    var lfo = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(_ctx.createOscillator(), null) : _ctx.createOscillator()); lfo.frequency.value = 0.13;
     var lg = _ctx.createGain(); lg.gain.value = 0.03;
     lfo.connect(lg); lg.connect(og.gain);
     o1.start(); o2.start(); lfo.start();
@@ -89,7 +89,7 @@
       // them all at once on resume.
       if (_ctx.state !== 'running') { timer.id = setTimeout(schedule, 900); return; }
       var t = _ctx.currentTime;
-      var o = _ctx.createOscillator(), g = _ctx.createGain();
+      var o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(_ctx.createOscillator(), null) : _ctx.createOscillator()), g = _ctx.createGain();
       o.type = 'triangle';
       o.frequency.value = notes[step % notes.length];
       step++;
@@ -107,7 +107,7 @@
   function _blip(bus, type, f0, f1, dur, gain) {
     if (!_ensure()) return;
     var t = _ctx.currentTime;
-    var o = _ctx.createOscillator(), g = _ctx.createGain();
+    var o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(_ctx.createOscillator(), bus) : _ctx.createOscillator()), g = _ctx.createGain();
     var v = 0.94 + _variant() * 0.12; // seeded pitch variant
     o.type = type;
     o.frequency.setValueAtTime(f0 * v, t);
@@ -146,7 +146,7 @@
     var name = names[Math.floor(_variant() * names.length) % names.length];
     var rec = _loadSample(name);
     if (rec.state !== 'ready' || !rec.buffer) return false;
-    var src = _ctx.createBufferSource();
+    var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(_ctx.createBufferSource(), null) : _ctx.createBufferSource());
     src.buffer = rec.buffer;
     src.connect(_buses.sfx);
     src.start();

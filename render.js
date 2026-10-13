@@ -1162,11 +1162,11 @@
       this._buildPost(this.size[0], this.size[1]);
     }
     if (this.composer) {
-      try { this.composer.render(dt); return; } catch (e) {
+      try { (globalThis.GameOptions ? globalThis.GameOptions.draw(this.composer.renderer, () => this.composer.render(dt)) : this.composer.render(dt)); return; } catch (e) {
         this.composer = null; this.postFailed = true; this.postKey = 'failed';
       }
     }
-    this.renderer.render(this.scene, this.camera);
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(this.renderer, () => this.renderer.render(this.scene, this.camera)) : this.renderer.render(this.scene, this.camera));
   };
 
   Renderer.prototype.disposeScene = function () {
