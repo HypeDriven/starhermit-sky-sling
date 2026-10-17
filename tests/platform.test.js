@@ -38,14 +38,22 @@ function freshPlatform(sh) {
 
 (async function () {
   // ---- hosted ----
-  var calls = [], save = null, kv = { music: 0.2, graphics: { preset: 'low' }, junk: 1 };
+  var calls = [], save = null, ver = 0, kv = { music: 0.2, graphics: { preset: 'low' }, junk: 1, 'ui.language': { choice: 'it-IT' } };
   var fetch = async function (url, init) {
     init = init || {};
     var method = init.method || 'GET', path = url.split('?')[0];
     calls.push({ url: url, method: method, auth: init.headers.Authorization, body: init.body, keepalive: init.keepalive });
     if (path === '/api/v1/users/' + USER + '/profile') return res(200, { username: 'sky_u', nickname: 'Aviator' });
-    if (path === '/api/v1/me/cloud-saves/' + encodeURIComponent('game:' + SLUG)) {
-      if (method === 'PUT') { save = Buffer.from(JSON.parse(init.body).dataBase64, 'base64'); return res(204); }
+    var slot = '/api/v1/me/cloud-saves/' + encodeURIComponent('game:' + SLUG);
+    if (path === slot + '/info') return res(200, save ? { exists: true, etag: 'v' + ver } : { exists: false });
+    if (path === slot) {
+      if (method === 'PUT') {
+        var h = init.headers || {}, cur = save ? 'v' + ver : null;
+        if ((h['If-Match'] && h['If-Match'] !== cur) || (h['If-None-Match'] === '*' && cur)) return res(412, { etag: cur });
+        save = Buffer.from(JSON.parse(init.body).dataBase64, 'base64');
+        ver++;
+        return res(200, { etag: 'v' + ver });
+      }
       return save ? res(200, new Uint8Array(save)) : res(404);
     }
     if (path === '/api/v1/games/' + SLUG + '/settings') {
@@ -75,8 +83,26 @@ function freshPlatform(sh) {
   assert.deepStrictEqual(await P.loadCloud(), { v: 1, stars: { 0: 3 } }, 'cloud round-trip');
   assert.strictEqual(P.syncStatus, 'synced');
 
+  // another device saves first: this write is refused (412) and reported
+  // through onSaveConflict; reload + save then goes through
+  var other = SDK.create({ window: win('#game_token=' + TOKEN), fetch: fetch, setTimeout: function () { return 0; }, clearTimeout: function () {} });
+  other.init();
+  await other.loadSave();
+  assert.strictEqual(await other.writeSave(JSON.stringify({ v: 1, stars: { 1: 2 } })), true, 'other device saved');
+  var conflicts = 0;
+  P.onSaveConflict = function () { conflicts++; };
+  P.scheduleCloudSave({ v: 1, stars: { 0: 3, 2: 1 } });
+  await P.flushCloudSave();
+  assert.strictEqual(conflicts, 1, 'saveconflict reaches the game');
+  assert.strictEqual(P.syncStatus, 'saving', 'a conflict is not shown as offline');
+  assert.deepStrictEqual(await P.loadCloud(), { v: 1, stars: { 1: 2 } }, 'reload sees the other device');
+  P.scheduleCloudSave({ v: 1, stars: { 0: 3, 1: 2, 2: 1 } });
+  await P.flushCloudSave();
+  assert.strictEqual(P.syncStatus, 'synced', 'merged save goes through');
+  assert.deepStrictEqual(JSON.parse(await other.loadSave()).stars, { 0: 3, 1: 2, 2: 1 }, 'merged save landed');
+
   var remote = await P.loadSettings();
-  assert.deepStrictEqual(remote, { music: 0.2, graphics: { preset: 'low' } }, 'only preference keys applied');
+  assert.deepStrictEqual(remote, { music: 0.2, graphics: { preset: 'low' } }, 'only preference keys applied (never the shared ui.* keys)');
   P.pushSettings({ music: 0.8, replayTutorial: true, largeText: true });
   await new Promise(function (r) { setTimeout(r, 0); });
   var patch = calls.filter(function (c) { return c.method === 'PATCH'; })[0];
@@ -122,11 +148,11 @@ function freshPlatform(sh) {
   assert.strictEqual(quiet.length, 0, 'no fetch standalone');
 
   // ---- on-platform without a token: sign-in offered ----
-  var sh3 = SDK.create({ window: win('', 'sky-sling.starhermit.com'), fetch: async function () { return res(500); } });
+  var sh3 = SDK.create({ window: win('', '0b9d6f2e-3c4a-4e5b-9a7c-1d2e3f405162.starhermit.com'), fetch: async function () { return res(500); } });
   sh3.init();
   var P3 = freshPlatform(sh3);
   P3.init();
-  assert.strictEqual(P3.canSignIn(), true, 'sign-in button on *.starhermit.com');
+  assert.strictEqual(P3.canSignIn(), true, 'sign-in button on <uuid>.starhermit.com');
 
   console.log('platform: all assertions passed');
 })().catch(function (e) { console.error('FAIL', e); process.exit(1); });

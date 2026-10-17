@@ -43,6 +43,7 @@
     syncStatus: 'offline',
     onSyncStatus: null,          // fn(status), set by boot
     onSignedOut: null,           // fn(), set by boot
+    onSaveConflict: null,        // fn(), set by boot: another device saved first
     controls: cloneControls(DEFAULT_CONTROLS),
     DEFAULT_CONTROLS: DEFAULT_CONTROLS,
     SYNCED_SETTINGS: SYNCED_SETTINGS
@@ -70,7 +71,8 @@
     return nicknameFor(platform.userId).then(function (nick) { platform.nickname = nick; return nick; });
   }
 
-  // ---- cloud save: one slot, remote wins conflicts ----
+  // ---- cloud save: one slot; boot.js merges the cloud doc into local progress
+  // (session.adoptProgress) on load and after a save conflict ----
   function scheduleCloudSave(progressDoc) {
     if (!platform.hosted) return;
     setSyncStatus('saving');
@@ -189,7 +191,15 @@
     if (!sh.token) sh.init();
     if (!wired) {
       wired = true;
-      sh.on('saved', function (ok) { setSyncStatus(ok ? 'synced' : 'offline'); });
+      sh.on('saved', function (ok) {
+        if (!ok && sh.saveConflicted && sh.saveConflicted()) return; // handled by 'saveconflict'
+        setSyncStatus(ok ? 'synced' : 'offline');
+      });
+      // Another device saved first (412): boot.js reloads, merges and saves again.
+      sh.on('saveconflict', function () {
+        setSyncStatus('saving');
+        if (platform.onSaveConflict) { try { platform.onSaveConflict(); } catch (_) {} }
+      });
       sh.on('auth', function (a) {
         var was = platform.hosted;
         syncFromSdk();

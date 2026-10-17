@@ -7,6 +7,19 @@
 (function () {
   var SS = window.SkySling;
   var R = SS.rules, C = SS.content, A = SS.audio, UI = SS.ui;
+  var I18N = SS.i18n, T = I18N.T, N = I18N.N;
+
+  // Player-facing names for mode ids and rule/session rejection reasons.
+  var MODE_NAMES = { learn: N('Learn'), journey: N('Journey'), daily: N('Daily'), practice: N('Practice'), challenge: N('Challenge') };
+  var REASONS = {
+    'round-over': N('The round is over.'), 'resolving': N('Wait for the shot to settle.'),
+    'no-shots-left': N('No shots left.'), 'velocity-not-a-number': N('Invalid aim.'),
+    'velocity-out-of-range': N('That shot is too strong.'), 'must-launch-rightward': N('Aim to the right.'),
+    'malformed-command': N('Invalid command.'), 'unknown-command': N('Invalid command.'),
+    'not-active': N('The round is not active.'), 'no-round': N('No round in progress.'),
+    'no-such-level': N('That stage does not exist.')
+  };
+  function reasonText(r) { return T(REASONS[r] || r); }
 
   var session = new SS.session.Session();
   var platform = SS.platform;   // launch-token auth, cloud mirror, read-only board
@@ -21,16 +34,25 @@
 
   // ---- hosted leaderboard: post the run, show the rank, then the top ten ---------
   var lbSeq = 0;
+  var lbState = null;   // { posting } | { posted, rank } — re-rendered on a language switch
+  function renderLeaderboardLine() {
+    var line = document.getElementById('res-lb');
+    if (!lbState) return;
+    var L = SS.shStrings.strings(I18N.getLang());
+    line.textContent = lbState.posting ? L.lbPosting
+      : !lbState.posted ? L.lbNotPosted
+        : lbState.rank ? L.lbRank.replace('{rank}', lbState.rank) : L.lbPosted;
+  }
   function postToLeaderboard(total) {
     var line = document.getElementById('res-lb');
-    var T = SS.shStrings.strings(navigator.language);
     var seq = ++lbSeq;
-    line.textContent = T.lbPosting;
+    lbState = { posting: true };
+    renderLeaderboardLine();
     line.classList.remove('hidden');
     platform.submitPlatformScore(total).then(function (r) {
       if (seq !== lbSeq) return;
-      line.textContent = !r.posted ? T.lbNotPosted
-        : r.rank ? T.lbRank.replace('{rank}', r.rank) : T.lbPosted;
+      lbState = r;
+      renderLeaderboardLine();
       showHostedBoard();
     });
   }
@@ -50,7 +72,7 @@
             rank: typeof e.rank === 'number' ? e.rank : null,
             score: e.score,
             userId: id != null ? String(id) : null,
-            nickname: nick || (id != null ? 'Player ' + String(id).slice(0, 8) : 'Player')
+            nickname: nick || (id != null ? T('Player {id}', { id: String(id).slice(0, 8) }) : T('Player'))
           };
         });
       })).then(function (rows) {
@@ -86,15 +108,16 @@
   function mountGraphicsPanel() {
     var host = document.getElementById('gfx-controls');
     if (!host || !SS.gfxui) return;
-    gfxPanel = SS.gfxui.mount(host, {
-      get: gfxSaved,
-      set: function (saved) {
-        session.saveSettings({ graphics: saved });
-        if (renderer && renderer.ok) renderer.setGraphics(saved);
-      },
-      info: function () { return renderer && renderer.ok ? renderer.graphicsInfo() : null; }
-    });
+    gfxPanel = SS.gfxui.mount(host, gfxApi, I18N.getLang());
   }
+  var gfxApi = {
+    get: gfxSaved,
+    set: function (saved) {
+      session.saveSettings({ graphics: saved });
+      if (renderer && renderer.ok) renderer.setGraphics(saved);
+    },
+    info: function () { return renderer && renderer.ok ? renderer.graphicsInfo() : null; }
+  };
   // keep the summary (pixels, fps) current while the settings panel is open
   function watchGraphicsPanel(open) {
     if (gfxTimer) { clearInterval(gfxTimer); gfxTimer = null; }
@@ -119,13 +142,13 @@
     var alive = s.targets.filter(function (t) { return t.alive; }).length;
     var score = R.computeScore(s);
     UI.setHUD({
-      objective: s.over ? (s.won ? 'Cleared!' : 'Out of shots') :
-        'Collapse every Bumble (' + alive + ' left)',
+      objective: s.over ? (s.won ? T('Cleared!') : T('Out of shots')) :
+        T('Collapse every Bumble ({n} left)', { n: alive }),
       targets: alive + ' / ' + s.targets.length,
       score: score.total,
       shots: s.shots - s.shotsUsed,
       best: session.mode === 'journey' ? (session.progress.bestScores[s.index] || 0) : '',
-      mode: session.mode ? session.mode[0].toUpperCase() + session.mode.slice(1) : ''
+      mode: session.mode ? T(MODE_NAMES[session.mode] || session.mode) : ''
     });
     UI.mirrorBoard(s);
     UI.setUndoEnabled(session.mode === 'practice' && session.snapshots.length > 0 && session.screen === 'active');
@@ -136,7 +159,7 @@
   function startRound(mode, ref) {
     if (!renderer || !renderer.ok) { pendingRound = [mode, ref]; return; }
     var res = session.startRound(mode, ref);
-    if (!res.ok) { UI.showError(res.reason); return; }
+    if (!res.ok) { UI.showError(reasonText(res.reason)); return; }
     lastLaunchCmd = null;
     kbAim.active = false;
     UI.showAchievement(null);
@@ -144,10 +167,15 @@
     renderer.sync(session.state);
     UI.show(null);
     UI.showCountdown(null);
+    renderRoundHints();
     var tut = session.level.tutorial;
-    UI.setHUD({ hint: tut ? tut.text : '', hintText: tut ? tut.text : 'Drag to aim, release to launch' });
-    if (tut) UI.announce('Lesson: ' + tut.text);
+    if (tut) UI.announce(T('Lesson: {text}', { text: T(tut.text) }));
     syncHUD();
+  }
+  // Tutorial texts are English content keys (content.js), shown in the game language.
+  function renderRoundHints() {
+    var tut = session.level && session.level.tutorial;
+    UI.setHUD({ hint: tut ? T(tut.text) : '', hintText: tut ? T(tut.text) : T('Drag to aim, release to launch') });
   }
 
   // Which overlay a modal (help / settings / error) should return to when it
@@ -160,12 +188,36 @@
     return 'ov-title';
   }
 
-  function toTitle() {
-    session.setScreen('title', 'nav');
+  function renderTitleProgress() {
     var cleared = Object.keys(session.progress.stars).length;
     document.getElementById('title-progress').textContent =
-      cleared ? 'Journey: ' + cleared + ' / ' + C.LEVEL_COUNT + ' stages cleared' : '';
+      cleared ? T('Journey: {n} / {total} stages cleared', { n: cleared, total: C.LEVEL_COUNT }) : '';
+  }
+  function toTitle() {
+    session.setScreen('title', 'nav');
+    renderTitleProgress();
     UI.show('ov-title');
+  }
+
+  // Boot / cloud-merge refresh of the title: never yank away a menu (help,
+  // settings, mode or stage select) the player opened while the 3D view loaded.
+  function settleTitle() {
+    var menus = ['ov-help', 'ov-settings', 'ov-mode-select', 'ov-level-select'];
+    if (!menus.some(function (id) { return UI.visible(id); })) { toTitle(); return; }
+    if (session.screen !== 'mode-select') session.setScreen('title', 'nav');
+    renderTitleProgress();
+  }
+
+  // Journey / Practice stage grid (rebuilt in place on a language switch).
+  var gridMode = null;
+  function buildStageGrid(mode) {
+    gridMode = mode;
+    var unlocked = 0;
+    for (var i = 0; i < C.LEVEL_COUNT; i++) if (session.progress.stars[i]) unlocked = i + 1;
+    document.getElementById('levels-h').textContent = mode === 'practice' ? T('Practice stages') : T('Journey stages');
+    UI.buildLevelGrid(C.LEVEL_COUNT, session.progress.stars, mode === 'practice' ? C.LEVEL_COUNT : unlocked, function (idx) {
+      startRound(mode, idx);
+    });
   }
 
   // ---- actions ---------------------------------------------------------------------------
@@ -185,12 +237,7 @@
     },
     journey: function () {
       A.play('ui');
-      var unlocked = 0;
-      for (var i = 0; i < C.LEVEL_COUNT; i++) if (session.progress.stars[i]) unlocked = i + 1;
-      document.getElementById('levels-h').textContent = 'Journey stages';
-      UI.buildLevelGrid(C.LEVEL_COUNT, session.progress.stars, unlocked, function (idx) {
-        startRound('journey', idx);
-      });
+      buildStageGrid('journey');
       session.setScreen('mode-select', 'journey-grid');
       UI.show('ov-level-select');
     },
@@ -198,10 +245,7 @@
     practice: function () {
       A.unlock(); A.play('ui');
       // practice is "any stage": all stages unlocked, still star-marked, unranked
-      document.getElementById('levels-h').textContent = 'Practice stages';
-      UI.buildLevelGrid(C.LEVEL_COUNT, session.progress.stars, C.LEVEL_COUNT, function (idx) {
-        startRound('practice', idx);
-      });
+      buildStageGrid('practice');
       session.setScreen('mode-select', 'practice-grid');
       UI.show('ov-level-select');
     },
@@ -242,11 +286,11 @@
     document.getElementById('btn-restart').addEventListener('click', actions.restart);
     document.getElementById('btn-undo').addEventListener('click', function () {
       var r = session.undo();
-      if (!r.ok) { UI.alert('Undo not available here.'); A.play('invalid'); }
+      if (!r.ok) { UI.alert(T('Undo not available here.')); A.play('invalid'); }
       else {
         // the restored state can re-issue the same launch identifier
         lastLaunchCmd = null;
-        renderer.sync(session.state); syncHUD(); UI.announce('Shot undone.');
+        renderer.sync(session.state); syncHUD(); UI.announce(T('Shot undone.'));
       }
     });
     document.getElementById('btn-skip').addEventListener('click', function () {
@@ -311,11 +355,11 @@
       lastLaunchCmd = id;
       renderer.hideAim();   // hand the bird back to the simulation
       A.play('launch');
-      UI.announce('Launched.');
+      UI.announce(T('Launched.'));
       if (session.settings.haptics && navigator.vibrate) { try { navigator.vibrate(15); } catch (_) {} }
     } else {
       A.play('invalid');
-      UI.alert('Cannot launch: ' + res.reason);
+      UI.alert(T('Cannot launch: {reason}', { reason: reasonText(res.reason) }));
     }
   }
 
@@ -353,7 +397,7 @@
       e.preventDefault();
       // preview keyboard aim as a pull vector
       renderer.showAim(-kbAim.vx / R.LAUNCH_POWER, -kbAim.vy / R.LAUNCH_POWER);
-      UI.setHUD({ hintText: 'Aim: vx ' + kbAim.vx.toFixed(1) + ', vy ' + kbAim.vy.toFixed(1) + ' — ' + platform.keyLabel('launch') + ' to launch' });
+      UI.setHUD({ hintText: T('Aim: vx {vx}, vy {vy} — {key} to launch', { vx: kbAim.vx.toFixed(1), vy: kbAim.vy.toFixed(1), key: platform.keyLabel('launch') }) });
     });
   }
 
@@ -369,7 +413,7 @@
           renderer.spawnImpact(blk.x, blk.y, true, s.mat, 'block');
         }
         else if (s.type === 'target-down') {
-          A.play('target'); UI.announce('Target down!');
+          A.play('target'); UI.announce(T('Target down!'));
           var tg = findById(session.state.targets, s.id);
           if (tg) renderer.spawnImpact(tg.x, tg.y, true, null, 'pop');
         }
@@ -379,7 +423,7 @@
         onResults(evt.result);
       } else if (evt.type === 'achievement') {
         var meta = SS.session.ACHIEVEMENTS.filter(function (a) { return a.key === evt.key; })[0];
-        if (meta) { UI.showAchievement(meta.name); UI.announce('Achievement unlocked: ' + meta.name); }
+        if (meta) { UI.showAchievement(meta.name); UI.announce(T('Achievement unlocked: {name}', { name: T(meta.name) })); }
       } else if (evt.type === 'settings') {
         if (!applyingRemoteSettings) platform.pushSettings(evt.settings); // platform settings KV mirror
       } else if (evt.type === 'progress') {
@@ -405,6 +449,7 @@
     }
     var note = '';
     lbSeq++;
+    lbState = null;
     document.getElementById('res-lb').classList.add('hidden');
     if (platform.hosted && /^(journey|daily|challenge)$/.test(session.mode)) {
       // Signed in: post the run to the platform high-score board (score-script.js).
@@ -415,22 +460,21 @@
       if (platform.hosted) {
         UI.showResults(result, stars, '');
       } else {
-        note = 'Submitting to daily board…';
+        note = N('Submitting to daily board…');
         UI.showResults(result, stars, note);
         platform.submitScore({
           board: 'daily', key: session.level.id,
           name: platform.nickname || 'guest', score: result.score.total,
           envelope: envelope
         }).then(function (res) {
-          var msg = res && res.ok
-            ? 'Ranked: submitted (validated server-side).'
-            : 'Daily board unavailable (' + ((res && res.error) || 'offline') + ') — score kept locally.';
-          if (res && res.ok && typeof res.rank === 'number') msg += ' Rank #' + res.rank + '.';
-          document.getElementById('res-ranked').textContent = msg;
+          UI.setRankedNote(res && res.ok
+            ? (typeof res.rank === 'number' ? [N('Ranked: submitted (validated server-side). Rank #{rank}.'), { rank: res.rank }]
+              : N('Ranked: submitted (validated server-side).'))
+            : [N('Daily board unavailable ({error}) — score kept locally.'), { error: (res && res.error) || 'offline' }]);
         });
       }
     } else {
-      note = session.mode === 'practice' ? 'Practice — unranked.' : '';
+      note = session.mode === 'practice' ? N('Practice — unranked.') : '';
       UI.showResults(result, stars, note);
     }
     document.getElementById('btn-next').style.display = result.won ? '' : 'none';
@@ -498,15 +542,20 @@
 
   // ---- StarHermit account controls + platform preferences --------------------------------------------
   var applyingRemoteSettings = false;
+  function accountStrings() { return SS.shStrings.strings(I18N.getLang()); }
+  function labelAccount() {
+    var L = accountStrings();
+    document.getElementById('btn-signin').textContent = L.signIn;
+    document.getElementById('btn-invite').textContent = L.invite;
+  }
   function wireAccount() {
-    var L = SS.shStrings.strings(navigator.language);
     var bIn = document.getElementById('btn-signin'), bInv = document.getElementById('btn-invite');
-    bIn.textContent = L.signIn;
-    bInv.textContent = L.invite;
+    labelAccount();
     bIn.addEventListener('click', function () { platform.signIn(); });
     bInv.addEventListener('click', function () {
       var link = platform.inviteLink();
       if (!link) return;
+      var L = accountStrings();
       var done = function () { UI.toast(L.copied); };
       var fail = function () { UI.toast(L.copyFailed + ': ' + link); };
       try { navigator.clipboard.writeText(link).then(done, fail); } catch (_) { fail(); }
@@ -514,7 +563,7 @@
     platform.onSignedOut = function () {
       UI.setProfileName(null);
       refreshAccount();
-      UI.toast(L.signedOut);
+      UI.toast(accountStrings().signedOut);
     };
     refreshAccount();
   }
@@ -527,13 +576,14 @@
     if (!el) return;
     var k = platform.keyLabel;
     el.innerHTML = '';
-    [[k('aimLeft') + k('aimRight') + k('aimUp') + k('aimDown'), ' aim, '], [k('launch'), ' launch, '],
-      [k('pause'), ' pause, '], [k('restart'), ' restart, '], [k('undo'), ' undo in practice, '],
-      [k('skip'), ' fast-forward.']].forEach(function (p) {
+    var parts = [[k('aimLeft') + k('aimRight') + k('aimUp') + k('aimDown'), N('aim')], [k('launch'), N('launch')],
+      [k('pause'), N('pause')], [k('restart'), N('restart')], [k('undo'), N('undo in practice')],
+      [k('skip'), N('fast-forward')]];
+    parts.forEach(function (p, i) {
       var kbd = document.createElement('kbd');
       kbd.textContent = p[0];
       el.appendChild(kbd);
-      el.appendChild(document.createTextNode(p[1]));
+      el.appendChild(document.createTextNode(' ' + T(p[1]) + (i < parts.length - 1 ? ', ' : '.')));
     });
   }
   // Signed in: platform settings win over local ones, then the player's key bindings.
@@ -553,7 +603,32 @@
   }
 
   // ---- boot -----------------------------------------------------------------------------------------------
+  // Another device saved first: reload the cloud doc, merge it into local
+  // progress and save the merge (adoptProgress mirrors it back to the cloud).
+  function resolveSaveConflict() {
+    platform.loadCloud().then(function (doc) {
+      if (!(doc && session.adoptProgress(doc))) platform.scheduleCloudSave(session.progress);
+      if (session.screen === 'title') renderTitleProgress();
+    });
+  }
+
+  // Language switch (Settings → Language, or the account preference arriving):
+  // re-render every dynamic string in place, mid-round included.
+  function refreshLanguage() {
+    UI.relabel();
+    labelAccount();
+    renderKeyHelp();
+    renderTitleProgress();
+    renderLeaderboardLine();
+    if (session.level && session.state && !session.state.over) renderRoundHints();
+    if (gridMode && UI.visible('ov-level-select')) buildStageGrid(gridMode);
+    if (gfxPanel) { mountGraphicsPanel(); if (renderer && renderer.ok) gfxPanel.refresh(); }
+    if (session.state) syncHUD();
+  }
+
   function boot() {
+    I18N.initLanguage();
+    I18N.onLanguage(refreshLanguage);
     UI.init(actions);
     // hosted iff a launch token was read (fragment, stripped; query = local dev)
     platform.init();
@@ -576,11 +651,13 @@
     mountGraphicsPanel();
     waitForTHREE(function (hasTHREE) {
       if (!hasTHREE || !setupRenderer()) { UI.show('ov-compat'); return; }
-      // remote-preferred progress: adopt the cloud doc (on conflict) once ready
+      // cloud progress is merged into local progress (session.adoptProgress:
+      // best of both) once ready; a later save conflict does the same
+      platform.onSaveConflict = resolveSaveConflict;
       platform.loadCloud().then(function (doc) {
-        if (doc && session.adoptProgress(doc) && session.screen === 'title') toTitle();
+        if (doc && session.adoptProgress(doc) && session.screen === 'title') settleTitle();
       });
-      toTitle();
+      settleTitle();
       if (pendingRound) { var pr = pendingRound; pendingRound = null; startRound(pr[0], pr[1]); }
       requestAnimationFrame(loop);
     }, 100);

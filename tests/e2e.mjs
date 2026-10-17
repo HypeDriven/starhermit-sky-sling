@@ -33,6 +33,7 @@
  * Run: npm run test:e2e  (or: node tests/e2e.mjs)
  */
 import { chromium } from 'playwright-core';
+import { stubStarHermit, launchToken } from './starhermit-e2e.mjs';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -377,6 +378,79 @@ async function graphicsPass(browser, name, ctxOpts) {
   if (errors.length) throw new Error(`${name} graphics pass had page errors:\n  ${errors.join('\n  ')}`);
 }
 
+// ---------- language + report (signed in through a stubbed StarHermit API) ----------
+// Automatic follows the account's preferred language (fr-CA); choosing Italian
+// in Settings mid-round (opened from the pause menu) re-renders the HUD, pause
+// menu, Graphics panel and settings in place and saves ui.language; Report a
+// problem posts to /reports. Real clicks/taps only; console errors fail.
+async function languagePass(browser, name, ctxOpts, touch) {
+  const errors = [];
+  const context = await browser.newContext(ctxOpts);
+  const page = await context.newPage();
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
+    errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  const press = async (sel) => { const l = page.locator(sel).first(); await l.scrollIntoViewIfNeeded(); return touch ? l.tap() : l.click(); };
+  const text = async (sel) => ((await page.locator(sel).first().textContent()) || '').trim();
+  try {
+    const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+    await page.goto('about:blank');
+    await page.goto(`${BASE}/index.html#game_token=${launchToken()}`, { waitUntil: 'load' });
+    await page.waitForSelector('#ov-title:not(.hidden)', { state: 'visible', timeout: 20000 });
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA', null, { timeout: 10000 });
+    if (await text('#ov-title [data-action="play"]') !== 'Jouer') throw new Error('title not in French');
+    await press('#ov-title [data-action="play"]');
+    await page.waitForSelector('#ov-title.hidden', { state: 'attached', timeout: 10000 });
+    await page.waitForFunction(() => /^Faites tomber tous les Bumbles/.test(document.getElementById('hud-objective').textContent), null, { timeout: 10000 });
+    if (await text('#hud-mode') !== 'Voyage') throw new Error('HUD mode not in French: ' + await text('#hud-mode'));
+    await press('#btn-pause');
+    await page.waitForSelector('#ov-pause:not(.hidden)', { state: 'visible' });
+    await press('#ov-pause [data-action="settings"]');
+    await page.waitForSelector('#ov-settings:not(.hidden)', { state: 'visible' });
+    const choice = page.locator('#ov-settings [data-game-language="choice"]');
+    await choice.scrollIntoViewIfNeeded();
+    const auto = ((await choice.locator('option').first().textContent()) || '').trim();
+    if (auto !== 'Automatique — Français (Canada)') throw new Error(`Automatic label not resolved: ${auto}`);
+    await choice.selectOption('it-IT');
+    await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+    await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]').textContent));
+    if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+    if (await text('#settings-h') !== 'Impostazioni') throw new Error('settings title not re-rendered');
+    if (await text('#gfx-section legend') !== 'Grafica') throw new Error('graphics panel not re-rendered: ' + await text('#gfx-section legend'));
+    if (await text('label[for="gfx-preset"] .gfx-label') !== 'Qualità') throw new Error('graphics rows not re-rendered');
+    if (!(await page.locator('#ov-settings label', { hasText: 'Musica' }).count())) throw new Error('audio settings not re-rendered');
+    await page.waitForFunction(() => /^Abbatti tutti i Bumble/.test(document.getElementById('hud-objective').textContent));
+    if (await text('#hud-mode') !== 'Viaggio') throw new Error('HUD mode not re-rendered');
+    if (await text('#pause-h') !== 'In pausa') throw new Error('pause menu not re-rendered');
+    const title = page.locator('[data-game-report="title"]');
+    await title.scrollIntoViewIfNeeded();
+    await title.fill('Test report');
+    await press('[data-game-report="send"]');
+    await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+    if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+    const vw = page.viewportSize().width;
+    for (const sel of ['[data-game-language="choice"]', '[data-game-report="send"]', '#gfx-preset', '[data-action="close-settings"]']) {
+      const b = await page.locator(sel).first().boundingBox();
+      if (!b || b.x < 0 || b.x + b.width > vw + 1) throw new Error(`${sel} cut off horizontally`);
+    }
+    await page.screenshot({ path: SHOT('language', name) });
+    await choice.selectOption('auto');
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+    await press('[data-action="close-settings"]');
+    await page.waitForSelector('#ov-pause:not(.hidden)', { state: 'visible' });
+    if (await text('#ov-pause [data-action="resume"]') !== 'Reprendre') throw new Error('pause menu not in French');
+    await press('#ov-pause [data-action="resume"]');
+    await page.waitForSelector('#ov-pause.hidden', { state: 'attached' });
+    await page.unroute(/\/api\/v1\//);
+  } finally {
+    await context.close();
+  }
+  if (errors.length) throw new Error(`${name} language pass had console output:\n  ${errors.join('\n  ')}`);
+  ok(`${name}: language — Automatic → fr-CA, Italian mid-round re-renders HUD/pause/graphics/settings, ui.language saved, report posted`);
+}
+
 // ---------- main ----------
 let browser = null;
 try {
@@ -390,6 +464,8 @@ try {
     { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, { full: false });
   await graphicsPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } });
   await graphicsPass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await languagePass(browser, 'desktop', { viewport: { width: 1280, height: 800 } }, false);
+  await languagePass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, true);
   console.log('\nE2E PASS — sky-sling, desktop + mobile, no page errors');
 } catch (e) {
   failures++;

@@ -18,6 +18,15 @@
   var _lastFocus = null;
   var _actions = {};   // action name -> handler
 
+  // Localization (i18n.js): English-keyed lookups; N() marks a key for extraction.
+  function I18N() { var g = typeof self !== 'undefined' ? self : globalThis; return (g.SkySling || {}).i18n || null; }
+  function T(key, vars) {
+    var I = I18N();
+    if (I) return I.T(key, vars);
+    return String(key).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? String(vars[k]) : m; });
+  }
+  function N(key) { return key; }
+
   function $(id) { return document.getElementById(id); }
 
   function init(actionHandlers) {
@@ -76,12 +85,13 @@
 
   // ---- profile / sync status (hosted only; hidden in local play) ----------------------
   function setProfileName(name) {
+    _profileName = name;
     var el = $('player-name');
     if (!el) return;
     if (name) {
       el.textContent = name;
       el.hidden = false;
-      el.setAttribute('title', 'Playing as ' + name);
+      el.setAttribute('title', T('Playing as {name}', { name: name }));
     } else {
       el.textContent = '';
       el.hidden = true;
@@ -89,27 +99,31 @@
   }
 
   var SYNC_LABELS = {
-    synced: 'Progress synced to cloud',
-    saving: 'Saving…',
-    offline: 'Cloud unavailable — local save'
+    synced: N('Progress synced to cloud'),
+    saving: N('Saving…'),
+    offline: N('Cloud unavailable — local save')
   };
+  var _sync = null, _profileName = null;
   function setSyncStatus(status) {
     var el = $('sync-status');
     if (!el) return;
-    var label = SYNC_LABELS[status] || '';
+    _sync = status;
+    var label = SYNC_LABELS[status] ? T(SYNC_LABELS[status]) : '';
     el.textContent = label;
     el.hidden = !label;
   }
 
   // Platform high-score board on the results screen: rows = [{rank, nickname, score,
   // userId}]; meId highlights the signed-in player's row. null clears.
+  var _board = null;
   function showBoard(rows, meId) {
+    _board = rows && rows.length ? [rows, meId] : null;
     var el = $('res-board');
     if (!el) return;
     el.innerHTML = '';
     if (!rows || !rows.length) { el.classList.add('hidden'); return; }
     var h = document.createElement('h3');
-    h.textContent = 'Leaderboard (top ' + rows.length + ')';
+    h.textContent = T('Leaderboard (top {n})', { n: rows.length });
     var ol = document.createElement('ol');
     rows.forEach(function (e, i) {
       var li = document.createElement('li');
@@ -125,28 +139,39 @@
   // ---- accessibility mirrors ---------------------------------------------------
   function announce(text) { $('live').textContent = ''; setTimeout(function () { $('live').textContent = text; }, 20); }
   function alert(text) { $('live-alert').textContent = ''; setTimeout(function () { $('live-alert').textContent = text; }, 20); }
-  function caption(text) { $('hint-text').textContent = text; }
+  // audio cues arrive as English caption keys (see audio.js caption calls)
+  function caption(text) { $('hint-text').textContent = T(text); }
+
+  var PHASES = { aim: N('aiming'), flight: N('in flight'), over: N('round over') };
 
   // Concise navigable board model (not every decorative object).
   function mirrorBoard(state) {
     if (!state) { $('sr-board').textContent = ''; return; }
     var alive = state.targets.filter(function (t) { return t.alive; }).length;
     var blocks = state.blocks.filter(function (b) { return b.alive; }).length;
-    $('sr-board').textContent =
-      'Board: ' + alive + ' of ' + state.targets.length + ' targets standing, ' +
-      blocks + ' blocks remaining. Shots used ' + state.shotsUsed + ' of ' + state.shots +
-      '. Phase: ' + state.phase + '.';
+    $('sr-board').textContent = T('Board: {alive} of {total} targets standing, {blocks} blocks remaining. Shots used {used} of {shots}. Phase: {phase}.', {
+      alive: alive, total: state.targets.length, blocks: blocks, used: state.shotsUsed, shots: state.shots,
+      phase: T(PHASES[state.phase] || state.phase)
+    });
   }
 
   // ---- results ------------------------------------------------------------------
-  function showResults(result, stars, rankedNote) {
-    $('res-title').textContent = result.won ? 'Stage Clear!' : 'Out of Shots';
-    $('res-score').textContent = result.score.total + ' points';
+  // rankedNote: '' | key | [key, vars] — kept so a language switch re-renders it.
+  var _results = null;
+  function noteText(note) {
+    if (!note) return '';
+    return Array.isArray(note) ? T(note[0], note[1]) : T(note);
+  }
+  function renderResults() {
+    if (!_results) return;
+    var result = _results.result, stars = _results.stars;
+    $('res-title').textContent = result.won ? T('Stage Clear!') : T('Out of Shots');
+    $('res-score').textContent = T('{n} points', { n: result.score.total });
     var tb = $('res-breakdown').querySelector('tbody');
     tb.innerHTML = '';
-    [['Targets', result.score.targets],
-     ['Blocks', result.score.blocks],
-     ['Unused-shot bonus', result.score.shotsBonus]
+    [[T('Targets'), result.score.targets],
+     [T('Blocks'), result.score.blocks],
+     [T('Unused-shot bonus'), result.score.shotsBonus]
     ].forEach(function (row) {
       var tr = document.createElement('tr');
       var a = document.createElement('td'); a.textContent = row[0];
@@ -155,16 +180,26 @@
     });
     $('res-stars').textContent = (result.won && stars != null)
       ? '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars) : '';
-    $('res-ranked').textContent = rankedNote || '';
+    $('res-ranked').textContent = noteText(_results.note);
+  }
+  function showResults(result, stars, rankedNote) {
+    _results = { result: result, stars: stars, note: rankedNote || '' };
+    renderResults();
     showBoard(null);
     show('ov-results');
-    announce((result.won ? 'Stage clear. ' : 'Out of shots. ') + 'Score ' + result.score.total + '.');
+    announce(T(result.won ? 'Stage clear. Score {n}.' : 'Out of shots. Score {n}.', { n: result.score.total }));
+  }
+  function setRankedNote(note) {
+    if (_results) _results.note = note || '';
+    $('res-ranked').textContent = noteText(note);
   }
 
   // name = null clears the banner (called at round start so an achievement from
   // an earlier round never re-appears on the next results screen)
+  var _achievement = null;   // English achievement name (translated on display)
   function showAchievement(name) {
-    $('res-achievement').textContent = name ? 'Achievement unlocked: ' + name : '';
+    _achievement = name || null;
+    $('res-achievement').textContent = name ? T('Achievement unlocked: {name}', { name: T(name) }) : '';
   }
 
   // ---- level select grid -----------------------------------------------------------
@@ -179,7 +214,7 @@
         var s = stars[idx] || 0;
         b.innerHTML = (idx + 1) + '<span class="stars">' +
           '\u2605'.repeat(s) + '\u2606'.repeat(Math.max(0, 3 - s)) + '</span>';
-        b.setAttribute('aria-label', 'Stage ' + (idx + 1) + (s ? ', ' + s + ' stars' : ''));
+        b.setAttribute('aria-label', s ? T('Stage {n}, {stars} stars', { n: idx + 1, stars: s }) : T('Stage {n}', { n: idx + 1 }));
         if (idx > unlocked) { b.classList.add('locked'); b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
         else b.addEventListener('click', function () { onPick(idx); });
         grid.appendChild(b);
@@ -231,9 +266,19 @@
   }
 
   function showError(msg) {
-    $('err-text').textContent = String(msg);
+    $('err-text').textContent = T(String(msg));
     show('ov-error');
-    alert('Error: ' + msg);
+    alert(T('Error: {msg}', { msg: T(String(msg)) }));
+  }
+
+  // Language switch: re-render the stateful pieces in place (data-i18n markup
+  // is re-applied by i18n.js; the HUD is redrawn every frame by boot.js).
+  function relabel() {
+    if (_profileName) setProfileName(_profileName);
+    if (_sync) setSyncStatus(_sync);
+    if (_results) renderResults();
+    if (_board) showBoard(_board[0], _board[1]);
+    if (_achievement) showAchievement(_achievement);
   }
 
   function showCountdown(text) {
@@ -252,6 +297,7 @@
     mirrorBoard: mirrorBoard, showResults: showResults, showAchievement: showAchievement,
     buildLevelGrid: buildLevelGrid, bindSettings: bindSettings, refreshSettings: refreshSettings, toast: toast,
     applyA11yClasses: applyA11yClasses, showError: showError,
-    showCountdown: showCountdown, setUndoEnabled: setUndoEnabled
+    showCountdown: showCountdown, setUndoEnabled: setUndoEnabled,
+    setRankedNote: setRankedNote, relabel: relabel, T: T, N: N
   };
 });

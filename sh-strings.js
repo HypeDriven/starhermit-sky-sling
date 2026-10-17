@@ -2,8 +2,8 @@
 
 /*
  * Sky Sling - localized strings for the StarHermit account controls
- * (sign-in, invite link, sign-out notice). Locale follows navigator.language
- * through the Graphics panel's picker.
+ * (sign-in, invite link, sign-out notice, leaderboard line). boot.js asks for
+ * the game language (i18n.js); tags are matched by the Graphics panel's picker.
  */
 (function (root) {
   var EN = {

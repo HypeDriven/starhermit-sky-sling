@@ -3,8 +3,9 @@
 /*
  * Sky Sling - Graphics settings section: quality preset, render scale,
  * per-effect overrides, adaptive resolution, frame-rate readout and a cost
- * summary. Strings are localized here (locale from navigator.language); the
- * rest of the game is English-only.
+ * summary. Strings are localized here; boot.js mounts the panel with the game
+ * language (i18n.js) and re-mounts it on a language switch. Only the
+ * #gfx-controls box is rebuilt, never the shared sections after it.
  */
 (function (root, factory) {
   var api = factory((root.SkySling || {}).gfx || (typeof module !== 'undefined' ? require('./gfx') : null));

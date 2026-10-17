@@ -63,7 +63,9 @@ body {
 #res-board h3 { margin: 0.3em 0; font-size: 0.95rem; }
 #res-board ol { margin: 0; padding-left: 0; list-style: none; max-height: 9em; overflow-y: auto; }
 #res-board li.me { color: var(--accent-2); font-weight: 700; }
-#hint-text { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); font-size: 0.9rem; }
+#hint-text { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); font-size: 0.9rem; min-width: 0; }
+#btn-pause { white-space: nowrap; flex: 0 0 auto; }
+@media (max-width: 420px) { #btn-pause span { display: none; } } /* phones: glyph only (aria-label "Pause"), room for the hint */
 
 aside {
   position: absolute; top: 64px; z-index: 4;
