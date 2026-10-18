@@ -163,7 +163,36 @@ Follow the skill pack's acceptance gate: deterministic seeds, debug views for co
 
 **Graphics.** The island is lit with ACES filmic tone mapping and sRGB output: a hemisphere sky fill, a key directional light whose PCF shadow frustum is fitted to the play volume (sling, structures and palms), and a faint warm back light from the visible sun. A vertex-coloured gradient sky dome per theme carries an additive sun glow and drifting clouds; with reflections on, a PMREM of that sky (sky gradient plus sun) is the scene environment, so the sea, ice and glossy pieces reflect the sky they sit under. The sea uses a procedural ripple normal map (sun glints on the water) with turquoise shallows and a pulsing foam line at the beach. Surfaces carry procedural canvas textures that double as material glyphs: wood planks with grain, seams and knots, stone with chips and cracks, frosted ice, speckled sand and mottled grass; blocks are bevelled (rounded boxes). Palms have segmented curved trunks, drooping fronds and coconuts; rocks line the beach. The bird has a clearcoat body, belly, eye glint, brow, crest and tail feathers; Bumbles have pupils, cheeks and a leaf sprout. The slingshot has rubber strands and a pouch while aiming, and the dotted arc tapers and glows softly. Impacts spray seeded sparks, material-coloured debris and a dust puff; a cleared Bumble pops in leaves. Ambient motion (palm sway, Bumble breathing, bird idle bob, water and cloud drift, foam pulse) stops with the game's reduced-motion setting or the OS `prefers-reduced-motion`. Post-processing (EffectComposer, vendored from the same three.js r185 as the core) runs RenderPass → GTAO → UnrealBloom (threshold 0.92, so only the sun, glints and the arc glow) → OutputPass → colour grade with vignette → SMAA/FXAA; sky, sun and clouds are kept out of the AO buffers. If the chain cannot be built the game renders without it and the Graphics section says so.
 
-The Settings panel's **Graphics** section offers: Quality (Auto — chosen from the WebGL unmasked renderer, where software renderers get Low, discrete GPUs and Apple M get High, others Balanced, and touch devices are capped at Balanced; Low; Balanced; High; Ultra); Render scale (50–200% of the preset's); one override per effect, each defaulting to "From preset (…)": Shadows (off/low/medium/high = none/1024²/2048²/4096²), Ambient occlusion (off/on/high), Bloom, Colour grade, Anti-aliasing (off/FXAA/SMAA/MSAA), Sky reflections, Particles (low/high), Sky & sea motion (still/animated) and Scene detail (plain/detailed — plain uses flat-coloured boxes, simple palms and no shallows/foam/rocks); Adaptive resolution (averages 90 frames, steps the scale down by 0.1 to 60% when frames exceed 26 ms and back up by 0.05 below 14 ms); Show frame rate (a readout at the top centre); and a summary line "GPU · cost · W×H px". Choosing a preset clears the overrides. The pixel ratio is min(devicePixelRatio, preset cap: Low 1, Balanced 1.5, High/Ultra 2) × render scale × adaptive scale. Changes apply immediately without reload and persist in `skysling.settings.v1` (`graphics`); the active preset is exposed as `data-gfx-preset` on the body and canvas. Low renders directly to the canvas (context MSAA, no composer). The section's strings follow the game language.
+The Settings panel's **Graphics** section offers: Quality (Auto — chosen from the StarHermit hardware level below; Low; Balanced; High; Ultra); Render scale (50–200% of the preset's); one override per effect, each defaulting to "From preset (…)": Shadows (off/low/medium/high = none/1024²/2048²/4096²), Ambient occlusion (off/on/high), Bloom, Colour grade, Anti-aliasing (off/FXAA/SMAA/MSAA), Sky reflections, Particles (low/high), Sky & sea motion (still/animated) and Scene detail (plain/detailed — plain uses flat-coloured boxes, simple palms and no shallows/foam/rocks); Adaptive resolution (averages 90 frames, steps the scale down by 0.1 to 60% when frames exceed 26 ms and back up by 0.05 below 14 ms); Show frame rate (a readout at the top centre); and a summary line "GPU · Level N · cost · W×H px" ("Level" localized). Choosing a preset clears the overrides. The pixel ratio is min(devicePixelRatio, preset cap: Low 1, Balanced 1.5, High/Ultra 2) × render scale × adaptive scale. Changes apply immediately without reload and persist in `skysling.settings.v1` (`graphics`); the active preset is exposed as `data-gfx-preset` on the body and canvas. Low renders directly to the canvas (context MSAA, no composer). The section's strings follow the game language.
+
+**Hardware-level detection.** `gpu-level.js` (shared StarHermit copy, `window.StarHermitGpu`, a classic script loaded before `gfx.js`, never edited here) rates the WebGL unmasked renderer plus device facts (`detectSystem()`: phone/tablet, cores, memory, screen) on the StarHermit hardware level 0–20 (0 = Galaxy S20 / Intel UHD or weaker and every software renderer; 20 = RTX 5090; each level ≈ 1.23×; laptop parts two levels below desktop; phones, tablets and ≤ 4 GB machines capped at 9). `gfx.js` maps it with `presetForLevel(level, { low: 0, balanced: 4, high: 10, ultra: 17 })`, so Auto picks Ultra on strong GPUs; adaptive resolution still steps down when slow. Headless SwiftShader is level 0 → Low. Phones and tablets pace Auto FPS at half the display refresh rate ("Auto (half refresh rate)") and start at 16 simultaneous sounds (shared `game-options.js`).
+
+**Per-preset budgets** (`BUDGETS` / `budgetFor` in `gfx.js`). Each preset holds 60 FPS on the weakest GPU Auto gives it — Low at level 0, Balanced 4, High 10, Ultra 17. Physics, stages, hit areas and scoring are identical on every preset; only visuals change. Cloud puffs are merged into one mesh per cloud (one draw call each). Spark counts are tuned at the floor level and scale up within the preset on faster GPUs (`StarHermitGpu.scaleBudget`, ≤ 2×, at most 56).
+
+| Preset (floor level) | Pixel ratio cap / scale | Materials | Tessellation | Surface textures | Clouds | Sparks per big hit | Post |
+|---|---|---|---|---|---|---|---|
+| Low (0) | 1 / 1 | Lambert | ½ of authored | — (plain detail) | 3 | 10 | none (canvas MSAA) |
+| Balanced (4) | 1.5 / 0.85 | Standard (no clearcoat) | ¾ | 256 px | 6 | 16 | half-res bloom, grade, FXAA |
+| High (10) | 2 / 1 | Physical (clearcoat bird, Bumbles, ice) | authored | 256 px | 8 | 20 | half-res GTAO + bloom, grade, SMAA |
+| Ultra (17) | 2 / 1.25 | Physical | 1.5× | 512 px | 10 | 28 | full-res GTAO (16 samples) + bloom, grade, MSAA |
+
+**Benchmark** (`node tools/gfx-bench.mjs sky-sling`; hook `tests/gfx-bench.mjs` picks the preset in Settings → Graphics, presses Play and keeps slinging the bird with real drags on the canvas, moving on or retrying from the results screen). Measured 2026-10-18 (GPU ms above the draws-skipped floor, projected to the preset's floor level; CPU p90 on the RTX 5090 run):
+
+Desktop 1920×1080:
+
+```
+PASS low       GPU p50 10.38 / p90 16.19 ms (same page, draws skipped: 10.50 / 12.72) on level 2 → at level 0: typical 0.00 (≤ 12), slow 5.25 (≤ 14)  CPU p90 0.90 ms (≤ 6)  frames 479/478
+PASS balanced  GPU p50 16.73 / p90 17.86 ms (same page, draws skipped: 9.61 / 14.27) on level 2 → at level 4: typical 4.70 (≤ 12), slow 2.38 (≤ 14)  CPU p90 1.50 ms (≤ 6)  frames 349/478
+PASS high      GPU p50 24.13 / p90 30.39 ms (same page, draws skipped: 9.57 / 14.56) on level 2 → at level 10: typical 2.78 (≤ 12), slow 3.02 (≤ 14)  CPU p90 2.70 ms (≤ 6)  frames 248/478
+PASS ultra     GPU p50 105.57 / p90 114.85 ms (same page, draws skipped: 15.91 / 18.14) on level 2 → at level 17: typical 4.02 (≤ 12), slow 4.33 (≤ 14)  CPU p90 1.80 ms (≤ 6)  frames 73/478
+```
+
+Phone 390×844 at DPR 3 (`--mobile --presets low,balanced`):
+
+```
+PASS low       GPU p50 13.99 / p90 15.50 ms (same page, draws skipped: 14.17 / 14.95) on level 2 → at level 0: typical 0.00 (≤ 12), slow 0.84 (≤ 14)  CPU p90 0.80 ms (≤ 6)  frames 480/477
+PASS balanced  GPU p50 13.39 / p90 18.48 ms (same page, draws skipped: 13.48 / 15.29) on level 2 → at level 4: typical 0.00 (≤ 12), slow 2.11 (≤ 14)  CPU p90 1.30 ms (≤ 6)  frames 478/478
+```
 
 ## 5. Technical architecture
 
@@ -173,7 +202,7 @@ The Settings panel's **Graphics** section offers: Quality (Auto — chosen from 
 - `rules`: pure deterministic state transitions, legality, scoring, seeded random stream.
 - `session`: local or hosted commands, snapshots, prediction policy, reconnect, replay.
 - `render`: Three.js scene graph, semantic entity views, camera, lighting, VFX, graphics settings, post-processing chain (`render.js`).
-- `gfx`: pure graphics quality model — presets, per-category overrides, GPU detection, `resolve()`, `describe()` (`gfx.js`, unit-tested in `tests/gfx.test.js`).
+- `gfx`: pure graphics quality model — presets, per-category overrides, hardware-level detection, per-preset budgets, `resolve()`, `describe()` (`gfx.js`, unit-tested in `tests/gfx.test.js`).
 - `gfxui`: the Graphics settings section and its localized strings (`gfxui.js`).
 - `vendor/three/addons/`: three.js r185 post-processing passes, shaders and `RoundedBoxGeometry`, mapped through the page import map as `three/addons/`.
 - `ui`: responsive DOM shell, focus, settings, overlays, accessibility mirror.

@@ -75,6 +75,43 @@
     try { return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); } catch (e) { return false; }
   }
 
+  // Run a post pass at a share of the frame: EffectComposer.addPass/setSize hand
+  // every pass the full frame size, so the pass's own setSize applies the
+  // budget's scale (half-resolution bloom and GTAO below Ultra).
+  function atScale(pass, k) {
+    if (!(k < 1)) return pass;
+    var setSize = pass.setSize.bind(pass);
+    pass.setSize = function (w, h) { setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+    return pass;
+  }
+
+  // Merge indexed geometries (position/normal/uv) into one, so a cluster of
+  // static pieces costs one draw call.
+  function mergeGeometries(THREE, geos) {
+    var nv = 0, ni = 0;
+    geos.forEach(function (g) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; });
+    var pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
+    var idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    var vo = 0, io = 0;
+    geos.forEach(function (g) {
+      var n = g.attributes.position.count;
+      pos.set(g.attributes.position.array, vo * 3);
+      nor.set(g.attributes.normal.array, vo * 3);
+      if (g.attributes.uv) uv.set(g.attributes.uv.array, vo * 2);
+      if (g.index) { for (var i = 0; i < g.index.count; i++) idx[io++] = g.index.array[i] + vo; }
+      else { for (var j = 0; j < n; j++) idx[io++] = j + vo; }
+      vo += n;
+      g.dispose();
+    });
+    var out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    out.setIndex(new THREE.BufferAttribute(idx, 1));
+    out.computeBoundingSphere();
+    return out;
+  }
+
   function Renderer(canvas) {
     this.ok = false;
     this.canvas = canvas;
@@ -105,10 +142,17 @@
     this.THREE = THREE;
     if (savedGfx) this.saved = savedGfx;
     if (this.gpu == null) {
-      this.gpu = probeGpu();
-      this.detected = G.detectPreset(this.gpu, { touch: isTouchDevice() });
+      // StarHermit hardware level (gpu-level.js): renderer string + device facts.
+      var GPU = typeof window !== 'undefined' && window.StarHermitGpu;
+      var sys = { mobile: isTouchDevice() };
+      if (GPU) {
+        try { sys = GPU.detectSystem(); } catch (e) { /* defaults */ }
+      }
+      this.gpu = sys.gpu || probeGpu();
+      this.gpuLevel = G.detectLevel(this.gpu, sys);
+      this.detected = G.presetForLevel(this.gpuLevel);
     }
-    this.q = G.resolve(this.saved, this.detected);
+    this.q = G.resolve(this.saved, this.detected, this.gpuLevel);
     // Canvas MSAA is fixed at context creation; later switches to MSAA use a
     // multisampled composer target instead.
     this.ctxMsaa = this.q.antialias === 'msaa';
@@ -189,9 +233,10 @@
   Renderer.prototype.setGraphics = function (saved) {
     this.saved = saved || {};
     var prev = this.q;
-    this.q = G.resolve(this.saved, this.detected);
+    this.q = G.resolve(this.saved, this.detected, this.gpuLevel);
     if (!this.ok) return;
     var g = this.q;
+    this._applyTextureBudget(g.budget.texture);
     var size = G.SHADOW_MAP[g.shadows];
     var shadowChanged = this.renderer.shadowMap.enabled !== (size > 0);
     this.renderer.shadowMap.enabled = size > 0;
@@ -206,8 +251,9 @@
     this.postKey = null;         // rebuild the post chain on the next frame
     this.size = [0, 0];          // re-apply the pixel ratio
     this._fpsVisible(g.showFps);
-    // scene detail / particle density change what buildLevel makes
-    if (this.level && prev && (prev.detail !== g.detail)) this.buildLevel(this.level, this._lastState);
+    // scene detail and the preset's asset budget (materials, tessellation,
+    // textures, clouds) change what buildLevel makes
+    if (this.level && prev && (prev.detail !== g.detail || prev.preset !== g.preset)) this.buildLevel(this.level, this._lastState);
     else if (shadowChanged) {
       this.scene.traverse(function (o) {
         if (!o.material) return;
@@ -224,6 +270,7 @@
   Renderer.prototype.graphicsInfo = function () {
     return {
       gpu: this.gpu || '',
+      level: this.gpuLevel,
       detected: this.detected,
       resolved: this.q,
       pixels: [Math.round(this.size[0] * this.pixelRatio), Math.round(this.size[1] * this.pixelRatio)],
@@ -337,7 +384,7 @@
       composer.setSize(w, h);
       composer.addPass(new A.RenderPass(this.scene, this.camera));
       if (g.ao !== 'off') {
-        var ao = new A.GTAOPass(this.scene, this.camera, pw, ph);
+        var ao = atScale(new A.GTAOPass(this.scene, this.camera, pw, ph), g.budget.aoRes);
         ao.output = A.GTAOPass.OUTPUT.Default;
         ao.blendIntensity = 0.75;
         ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.5, thickness: 1.2, scale: 1.0, samples: g.ao === 'high' ? 16 : 8 });
@@ -355,7 +402,7 @@
       }
       if (g.bloom === 'on') {
         // high threshold: only the sun, glints and bright highlights bloom
-        composer.addPass(new A.UnrealBloomPass(new THREE.Vector2(w, h), 0.25, 0.3, 0.92));
+        composer.addPass(atScale(new A.UnrealBloomPass(new THREE.Vector2(w, h), 0.25, 0.3, 0.92), g.budget.bloomRes));
       }
       composer.addPass(new A.OutputPass());
       if (g.grade === 'on') {
@@ -398,17 +445,25 @@
 
   // ---------------------------------------------------------------- procedural textures
 
-  function canvasTex(THREE, key, cache, size, draw, opts) {
-    if (cache[key]) return cache[key];
+  // `authored` is the size the art is drawn for; `size` (the preset's texture
+  // budget) scales it. opts.direct draws at `size` itself (pixel-exact art).
+  function canvasTex(THREE, key, cache, authored, draw, opts, size) {
+    size = size || authored;
+    var ck = key + '@' + size;
+    if (cache[ck]) return cache[ck];
     var c = document.createElement('canvas');
     c.width = c.height = size;
     var ctx = c.getContext('2d');
-    draw(ctx, size, R.mulberry32(hashStr(key)));
+    if (opts && opts.direct) draw(ctx, size, R.mulberry32(hashStr(key)));
+    else {
+      if (size !== authored) ctx.scale(size / authored, size / authored);
+      draw(ctx, authored, R.mulberry32(hashStr(key)));
+    }
     var t = new THREE.CanvasTexture(c);
     t.colorSpace = opts && opts.linear ? THREE.NoColorSpace : THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 4;
-    cache[key] = t;
+    cache[ck] = t;
     return t;
   }
 
@@ -567,26 +622,60 @@
     ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
   }
 
+  // Surface textures are drawn at the preset's budget size (authored at 256 px;
+  // the water ripple normal map at half of it).
   Renderer.prototype._texture = function (name) {
-    var THREE = this.THREE, cache = this._tex;
+    var THREE = this.THREE, cache = this._tex, size = this._texSize || 256;
     switch (name) {
-      case 'wood': return canvasTex(THREE, 'wood', cache, 256, drawWood);
+      case 'wood': return canvasTex(THREE, 'wood', cache, 256, drawWood, null, size);
       case 'wood-v':
-        if (!cache['wood-v']) {
+        if (!cache['wood-v@' + size]) {
           var t = this._texture('wood').clone();
           t.center.set(0.5, 0.5); t.rotation = Math.PI / 2; t.needsUpdate = true;
-          cache['wood-v'] = t;
+          cache['wood-v@' + size] = t;
         }
-        return cache['wood-v'];
-      case 'stone': return canvasTex(THREE, 'stone', cache, 256, drawStone);
-      case 'ice': return canvasTex(THREE, 'ice', cache, 256, drawIce);
-      case 'sand': return canvasTex(THREE, 'sand', cache, 256, drawSand);
-      case 'grass': return canvasTex(THREE, 'grass', cache, 256, drawGrass);
-      case 'water-n': return canvasTex(THREE, 'water-n', cache, 128, drawWaterNormal, { linear: true });
+        return cache['wood-v@' + size];
+      case 'stone': return canvasTex(THREE, 'stone', cache, 256, drawStone, null, size);
+      case 'ice': return canvasTex(THREE, 'ice', cache, 256, drawIce, null, size);
+      case 'sand': return canvasTex(THREE, 'sand', cache, 256, drawSand, null, size);
+      case 'grass': return canvasTex(THREE, 'grass', cache, 256, drawGrass, null, size);
+      case 'water-n': return canvasTex(THREE, 'water-n', cache, 128, drawWaterNormal, { linear: true, direct: true }, Math.max(64, size / 2));
       case 'radial': return canvasTex(THREE, 'radial', cache, 128, drawRadial, { linear: true });
       case 'glow': return canvasTex(THREE, 'glow', cache, 128, drawGlow);
     }
     return null;
+  };
+
+  // A new texture budget: drop the surface textures drawn at the old size (the
+  // level is rebuilt with the new ones).
+  Renderer.prototype._applyTextureBudget = function (size) {
+    if (size === this._texSize) return;
+    var cache = this._tex, keep = ['radial@128', 'glow@128'];
+    Object.keys(cache).forEach(function (k) {
+      if (keep.indexOf(k) >= 0) return;
+      cache[k].dispose();
+      delete cache[k];
+    });
+    this._texSize = size;
+  };
+
+  // Scene material at the budget's shading model: Lambert on Low, Standard on
+  // Balanced (clearcoat dropped), Physical where asked for on High/Ultra.
+  Renderer.prototype._mat = function (params, physical) {
+    var THREE = this.THREE, tier = this.q.budget.material;
+    var p = Object.assign({}, params);
+    if (tier === 'lambert') {
+      ['roughness', 'metalness', 'clearcoat', 'clearcoatRoughness', 'envMapIntensity'].forEach(function (k) { delete p[k]; });
+      return new THREE.MeshLambertMaterial(p);
+    }
+    if (physical && tier === 'physical') return new THREE.MeshPhysicalMaterial(p);
+    delete p.clearcoat; delete p.clearcoatRoughness;
+    return new THREE.MeshStandardMaterial(p);
+  };
+
+  // Tessellation at the budget's share of the authored segment count.
+  Renderer.prototype._seg = function (n, min) {
+    return Math.max(min || 3, Math.round(n * this.q.budget.segments));
   };
 
   // ---------------------------------------------------------------- scene building
@@ -664,29 +753,30 @@
 
     // drifting clouds: clusters of soft puffs far behind the island
     var cloudMat = new THREE.MeshLambertMaterial({ color: 0xf4f7fa, emissive: new THREE.Color(sky.horizon).multiplyScalar(0.3), fog: false });
-    var puffGeo = new THREE.SphereGeometry(1, 14, 10);
-    var nClouds = detailed ? 8 : 3;
+    var puffGeo = new THREE.SphereGeometry(1, this._seg(14, 6), this._seg(10, 4));
+    var nClouds = detailed ? this.q.budget.clouds : 3;
     this.clouds = [];
     this.noAO = [dome, sun];   // hidden from the GTAO depth/normal pass
+    var puffMatrix = new THREE.Matrix4(), puffQuat = new THREE.Quaternion();
     for (var ci = 0; ci < nClouds; ci++) {
-      var cloud = new THREE.Group();
-      var puffs = 4 + Math.floor(rnd() * 4);
+      // each cloud's puffs are merged into one mesh (one draw call per cloud)
+      var puffs = 4 + Math.floor(rnd() * 4), parts = [];
       for (var pi = 0; pi < puffs; pi++) {
-        var puff = new THREE.Mesh(puffGeo, cloudMat);
         var r = 1.6 + rnd() * 1.8;
-        puff.scale.set(r * 1.3, r * 0.8, r);
-        puff.position.set((pi - puffs / 2) * 2.0 + rnd() * 1.2, rnd() * 1.1, rnd() * 2);
-        cloud.add(puff);
+        puffMatrix.compose(new THREE.Vector3((pi - puffs / 2) * 2.0 + rnd() * 1.2, rnd() * 1.1, rnd() * 2), puffQuat, new THREE.Vector3(r * 1.3, r * 0.8, r));
+        parts.push(puffGeo.clone().applyMatrix4(puffMatrix));
       }
+      var cloud = new THREE.Mesh(mergeGeometries(THREE, parts), cloudMat);
       cloud.position.set(-70 + ci * (170 / nClouds) + rnd() * 12, 6 + rnd() * 7, -105 - rnd() * 35);
       cloud.userData.speed = 0.25 + rnd() * 0.35;
       env.add(cloud);
       this.clouds.push(cloud);
       this.noAO.push(cloud);
     }
+    puffGeo.dispose();
 
-    var waterMat = new THREE.MeshStandardMaterial({ color: theme.water, roughness: detailed ? 0.3 : 0.55, metalness: 0.0 });
-    if (detailed) {
+    var waterMat = this._mat({ color: theme.water, roughness: detailed ? 0.3 : 0.55, metalness: 0.0 });
+    if (detailed && !waterMat.isMeshLambertMaterial) {
       waterMat.normalMap = this._texture('water-n');
       waterMat.normalScale = new THREE.Vector2(0.3, 0.3);
       waterMat.normalMap.repeat.set(36, 36);
@@ -700,12 +790,12 @@
     if (detailed) {
       // turquoise shallows around the island and a pulsing foam line
       var shallowCol = new THREE.Color(theme.water).lerp(new THREE.Color(0x7fe6d8), 0.45);
-      var shallows = new THREE.Mesh(new THREE.CircleGeometry(38, 64), new THREE.MeshStandardMaterial({
+      var shallows = new THREE.Mesh(new THREE.CircleGeometry(38, this._seg(64, 16)), this._mat({
         color: shallowCol, roughness: 0.2, transparent: true, alphaMap: this._texture('radial'), depthWrite: false
       }));
       shallows.rotation.x = -Math.PI / 2; shallows.position.set(10, -1.17, 0);
       env.add(shallows);
-      var foam = new THREE.Mesh(new THREE.TorusGeometry(28.2, 0.22, 6, 120), new THREE.MeshStandardMaterial({
+      var foam = new THREE.Mesh(new THREE.TorusGeometry(28.2, 0.22, this._seg(6, 3), this._seg(120, 32)), this._mat({
         color: 0xffffff, roughness: 0.6, transparent: true, opacity: 0.8
       }));
       foam.rotation.x = -Math.PI / 2; foam.position.set(10, -1.16, 0);
@@ -713,18 +803,18 @@
       this.animated.push({ obj: foam, kind: 'foam', phase: 0 });
     }
 
-    var sandMat = new THREE.MeshStandardMaterial({ color: theme.sand, roughness: 0.95 });
-    var grassMat = new THREE.MeshStandardMaterial({ color: theme.foliage, roughness: 0.9 });
+    var sandMat = this._mat({ color: theme.sand, roughness: 0.95 });
+    var grassMat = this._mat({ color: theme.foliage, roughness: 0.9 });
     if (detailed) {
       sandMat.map = this._texture('sand'); sandMat.map.repeat.set(6, 1);
       grassMat.map = this._texture('grass'); grassMat.map.repeat.set(5, 5);
     }
-    var island = new THREE.Mesh(new THREE.CylinderGeometry(26, 30, 2.4, 64), sandMat);
+    var island = new THREE.Mesh(new THREE.CylinderGeometry(26, 30, 2.4, this._seg(64, 16)), sandMat);
     island.position.set(10, -1.2, 0);
     island.receiveShadow = true;
     env.add(island);
 
-    var grassTop = new THREE.Mesh(new THREE.CylinderGeometry(24, 26, 0.25, 64), grassMat);
+    var grassTop = new THREE.Mesh(new THREE.CylinderGeometry(24, 26, 0.25, this._seg(64, 16)), grassMat);
     grassTop.position.set(10, -0.12, 0);
     grassTop.receiveShadow = true;
     env.add(grassTop);
@@ -735,7 +825,7 @@
     }
     if (detailed) {
       // rocks along the beach and grass tufts (instanced) for ground texture
-      var rockMat = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 0.85, flatShading: true });
+      var rockMat = this._mat({ color: 0x9a968c, roughness: 0.85, flatShading: true });
       var rockGeo = new THREE.DodecahedronGeometry(1, 0);
       for (var k = 0; k < 9; k++) {
         var ang = -Math.PI * 0.15 + rnd() * Math.PI * 1.3;
@@ -756,18 +846,18 @@
     game.name = 'gameplay';
 
     // slingshot: fork + rubber band
-    var slingMat = new THREE.MeshStandardMaterial({ color: 0x7a4e28, roughness: 0.7 });
+    var slingMat = this._mat({ color: 0x7a4e28, roughness: 0.7 });
     if (detailed) slingMat.map = this._texture('wood-v');
-    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 1.6, 12), slingMat);
+    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 1.6, this._seg(12, 6)), slingMat);
     trunk.position.set(R.SLING_X, 0.8, 0);
-    var armL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.9, 12), slingMat);
+    var armL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.9, this._seg(12, 6)), slingMat);
     armL.position.set(R.SLING_X - 0.22, 1.85, 0); armL.rotation.z = 0.5;
-    var armR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.9, 12), slingMat);
+    var armR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.9, this._seg(12, 6)), slingMat);
     armR.position.set(R.SLING_X + 0.22, 1.85, 0); armR.rotation.z = -0.5;
     [trunk, armL, armR].forEach(function (m) { m.castShadow = true; m.receiveShadow = true; game.add(m); });
 
     // band: two rubber strands meeting at the pouch (shown while aiming)
-    var bandMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.6 });
+    var bandMat = this._mat({ color: 0x3a2a1a, roughness: 0.6 });
     var strandGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6);
     strandGeo.translate(0, 0.5, 0);
     this.band = new THREE.Group();
@@ -784,17 +874,17 @@
     var birdBody = new THREE.Group();
     this.birdBody = birdBody;
     this.bird.add(birdBody);
-    var birdMat = new THREE.MeshPhysicalMaterial({ color: theme.accent, roughness: 0.45, clearcoat: 0.7, clearcoatRoughness: 0.25 });
-    var body = new THREE.Mesh(new THREE.SphereGeometry(R.BIRD_R, 28, 20), birdMat);
+    var birdMat = this._mat({ color: theme.accent, roughness: 0.45, clearcoat: 0.7, clearcoatRoughness: 0.25 }, true);
+    var body = new THREE.Mesh(new THREE.SphereGeometry(R.BIRD_R, this._seg(28, 12), this._seg(20, 8)), birdMat);
     body.castShadow = true;
     birdBody.add(body);
-    var bellyMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.accent).lerp(new THREE.Color(0xfff2dc), 0.6), roughness: 0.6 });
-    var belly = new THREE.Mesh(new THREE.SphereGeometry(R.BIRD_R * 0.78, 18, 12), bellyMat);
+    var bellyMat = this._mat({ color: new THREE.Color(theme.accent).lerp(new THREE.Color(0xfff2dc), 0.6), roughness: 0.6 });
+    var belly = new THREE.Mesh(new THREE.SphereGeometry(R.BIRD_R * 0.78, this._seg(18, 8), this._seg(12, 6)), bellyMat);
     belly.position.set(0.07, -0.1, 0.1);
     belly.scale.set(0.9, 0.75, 0.8);
     birdBody.add(belly);
-    var eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-    var pupilMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2 });
+    var eyeMat = this._mat({ color: 0xffffff, roughness: 0.3 });
+    var pupilMat = this._mat({ color: 0x1a1a1a, roughness: 0.2 });
     var glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     var e1 = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 8), eyeMat);
     e1.position.set(0.16, 0.1, 0.26);
@@ -806,10 +896,10 @@
     brow.position.set(0.16, 0.21, 0.27); brow.rotation.z = -0.35;
     [e1, p1, g1, brow].forEach(function (m) { birdBody.add(m); });
     var beak = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.2, 10),
-      new THREE.MeshStandardMaterial({ color: 0xf0b040, roughness: 0.4 }));
+      this._mat({ color: 0xf0b040, roughness: 0.4 }));
     beak.rotation.z = -Math.PI / 2; beak.position.set(0.37, 0, 0.04);
     birdBody.add(beak);
-    var featherMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.accent).multiplyScalar(0.7), roughness: 0.6 });
+    var featherMat = this._mat({ color: new THREE.Color(theme.accent).multiplyScalar(0.7), roughness: 0.6 });
     for (var f = 0; f < 3; f++) {
       var tail = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.26, 6), featherMat);
       tail.position.set(-0.36, 0.02 + (f - 1) * 0.06, 0);
@@ -832,15 +922,15 @@
       if (mats[key]) return mats[key];
       var m;
       if (kind === 'ice') {
-        m = new THREE.MeshPhysicalMaterial({
+        m = self._mat({
           color: detailed ? 0xa6daf0 : MAT_COLORS.ice, roughness: 0.12, transparent: true, opacity: 0.86,
           clearcoat: detailed ? 1 : 0, clearcoatRoughness: 0.1,
           emissive: new THREE.Color(detailed ? 0x24566c : 0x1b3a48), envMapIntensity: 0.8
-        });
+        }, true);
       } else if (kind === 'stone') {
-        m = new THREE.MeshStandardMaterial({ color: MAT_COLORS.stone, roughness: 0.88, envMapIntensity: 0.6 });
+        m = self._mat({ color: MAT_COLORS.stone, roughness: 0.88, envMapIntensity: 0.6 });
       } else {
-        m = new THREE.MeshStandardMaterial({ color: MAT_COLORS.wood, roughness: 0.72 });
+        m = self._mat({ color: MAT_COLORS.wood, roughness: 0.72 });
       }
       if (detailed) {
         m.map = self._texture(kind === 'wood' && vertical ? 'wood-v' : kind);
@@ -862,14 +952,15 @@
     });
 
     // targets: round critters with eyes, pupils and a leaf sprout — shape-coded, not colour-only
-    var bumbleMat = new THREE.MeshPhysicalMaterial({ color: 0x77c04a, roughness: 0.55, clearcoat: 0.45, clearcoatRoughness: 0.35 });
-    var sproutMat = new THREE.MeshStandardMaterial({ color: 0x3f8a2a, roughness: 0.6 });
-    var cheekMat = new THREE.MeshStandardMaterial({ color: 0xf29a8a, roughness: 0.7 });
+    var bumbleMat = this._mat({ color: 0x77c04a, roughness: 0.55, clearcoat: 0.45, clearcoatRoughness: 0.35 }, true);
+    var sproutMat = this._mat({ color: 0x3f8a2a, roughness: 0.6 });
+    var cheekMat = this._mat({ color: 0xf29a8a, roughness: 0.7 });
+    var sphW = this._seg(24, 12), sphH = this._seg(16, 8);
     level.targets.forEach(function (t, ti) {
       var g = new THREE.Group();
       var inner = new THREE.Group();
       g.add(inner);
-      var bodyT = new THREE.Mesh(new THREE.SphereGeometry(t.r, 24, 16), bumbleMat);
+      var bodyT = new THREE.Mesh(new THREE.SphereGeometry(t.r, sphW, sphH), bumbleMat);
       bodyT.castShadow = true; bodyT.receiveShadow = true;
       inner.add(bodyT);
       var te1 = new THREE.Mesh(new THREE.SphereGeometry(t.r * 0.22, 10, 8), eyeMat);
@@ -918,13 +1009,13 @@
   Renderer.prototype._makePalm = function (x, z, s, theme, detailed, rnd) {
     var THREE = this.THREE;
     var g = new THREE.Group();
-    var barkA = new THREE.MeshStandardMaterial({ color: 0x8a6a42, roughness: 0.9 });
-    var barkB = new THREE.MeshStandardMaterial({ color: 0x74573a, roughness: 0.9 });
+    var barkA = this._mat({ color: 0x8a6a42, roughness: 0.9 });
+    var barkB = this._mat({ color: 0x74573a, roughness: 0.9 });
     var segs = detailed ? 6 : 1, lean = 0.12 + rnd() * 0.12;
     var top = new THREE.Vector3(0, 0, 0);
     for (var i = 0; i < segs; i++) {
       var h = (2.2 * s) / segs;
-      var seg = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s * (1 - i / (segs * 2.2)), 0.14 * s * (1 - i / (segs * 2.5)), h * 1.04, 8), i % 2 ? barkB : barkA);
+      var seg = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s * (1 - i / (segs * 2.2)), 0.14 * s * (1 - i / (segs * 2.5)), h * 1.04, this._seg(8, 5)), i % 2 ? barkB : barkA);
       var bend = lean * (i / segs) * (i / segs) * 2.2;
       seg.position.set(top.x + Math.sin(bend) * h / 2, top.y + Math.cos(bend) * h / 2, 0);
       seg.rotation.z = -bend;
@@ -934,13 +1025,13 @@
     }
     var crown = new THREE.Group();
     crown.position.copy(top);
-    var leafMat = new THREE.MeshStandardMaterial({ color: theme.foliage, roughness: 0.8, side: THREE.DoubleSide });
+    var leafMat = this._mat({ color: theme.foliage, roughness: 0.8, side: THREE.DoubleSide });
     var fronds = detailed ? 8 : 5;
     for (var f = 0; f < fronds; f++) {
       var ang = (f / fronds) * Math.PI * 2 + rnd() * 0.3;
       var frond;
       if (detailed) {
-        var geo = new THREE.PlaneGeometry(0.42 * s, 1.7 * s, 1, 8);
+        var geo = new THREE.PlaneGeometry(0.42 * s, 1.7 * s, 1, this._seg(8, 4));
         var pos = geo.attributes.position;
         for (var v = 0; v < pos.count; v++) {
           var yy = pos.getY(v) / (1.7 * s) + 0.5;           // 0 at base, 1 at tip
@@ -964,9 +1055,9 @@
       crown.add(frond);
     }
     if (detailed) {
-      var nutMat = new THREE.MeshStandardMaterial({ color: 0x5a3d22, roughness: 0.7 });
+      var nutMat = this._mat({ color: 0x5a3d22, roughness: 0.7 });
       for (var n = 0; n < 3; n++) {
-        var nut = new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, 8, 6), nutMat);
+        var nut = new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, this._seg(8, 5), this._seg(6, 4)), nutMat);
         nut.position.set(Math.cos(n * 2.1) * 0.13 * s, -0.1 * s, Math.sin(n * 2.1) * 0.13 * s);
         crown.add(nut);
       }
@@ -1065,7 +1156,8 @@
     var rnd = R.mulberry32(((x * 131 + y * 57) | 0) >>> 0); // seeded cosmetic variants
     var sparkMat = new THREE.MeshBasicMaterial({ color: kind === 'pop' ? new THREE.Color(0.9, 1.6, 0.6) : new THREE.Color(1.6, 1.45, 1.1), transparent: true, depthWrite: false });
     mats.push(sparkMat);
-    var nSpark = (kind === 'impact' ? 6 : 12) * (high ? 1.6 : 0.6) | 0;
+    // sparks per hit from the preset's budget (scaled with the hardware level)
+    var nSpark = Math.max(2, Math.round(this.q.budget.sparks * (kind === 'impact' ? 0.5 : 1) * (high ? 1 : 0.4)));
     for (var i = 0; i < nSpark; i++) {
       var p = new THREE.Mesh(this._sparkGeo, sparkMat);
       p.scale.setScalar(0.05 + rnd() * 0.06);
@@ -1076,7 +1168,7 @@
       group.add(p); parts.push(p);
     }
     if (high && kind !== 'impact') {
-      var chunkMat = new THREE.MeshStandardMaterial({
+      var chunkMat = this._mat({
         color: kind === 'pop' ? 0x5da83a : (MAT_COLORS[mat] || MAT_COLORS.wood), roughness: 0.7, transparent: true
       });
       mats.push(chunkMat);

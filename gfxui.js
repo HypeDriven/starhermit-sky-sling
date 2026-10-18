@@ -26,7 +26,7 @@
       static: 'Still', animated: 'Animated', plain: 'Plain', detailed: 'Detailed' },
     adaptive: 'Adaptive resolution', fps: 'Show frame rate',
     postFailed: 'Post-processing is unavailable on this device; effects are rendered without it.',
-    gpuUnknown: 'Unknown GPU',
+    gpuUnknown: 'Unknown GPU', level: 'Level {n}',
     words: { noShadows: 'no shadows', shadows: 'shadows', ao: 'ambient occlusion', aoHigh: 'full ambient occlusion',
       bloom: 'bloom', reflections: 'sky reflections', noAA: 'no anti-aliasing' }
   };
@@ -48,7 +48,7 @@
     tier: { off: 'No', on: 'Sí', low: 'Bajo', medium: 'Medio', high: 'Alto', static: 'Quieto', animated: 'Animado', plain: 'Simple', detailed: 'Detallado' },
     adaptive: 'Resolución adaptativa', fps: 'Mostrar fotogramas por segundo',
     postFailed: 'El posprocesado no está disponible en este dispositivo; se muestra sin efectos.',
-    gpuUnknown: 'GPU desconocida',
+    gpuUnknown: 'GPU desconocida', level: 'Nivel {n}',
     words: { noShadows: 'sin sombras', shadows: 'sombras', ao: 'oclusión ambiental', aoHigh: 'oclusión ambiental completa',
       bloom: 'resplandor', reflections: 'reflejos del cielo', noAA: 'sin suavizado' }
   };
@@ -62,7 +62,7 @@
     tier: { off: 'Non', on: 'Oui', low: 'Basses', medium: 'Moyennes', high: 'Élevées', static: 'Fixe', animated: 'Animé', plain: 'Simple', detailed: 'Détaillé' },
     adaptive: 'Résolution adaptative', fps: 'Afficher les images par seconde',
     postFailed: 'Le post-traitement n’est pas disponible sur cet appareil ; le rendu se fait sans effets.',
-    gpuUnknown: 'GPU inconnu',
+    gpuUnknown: 'GPU inconnu', level: 'Niveau {n}',
     words: { noShadows: 'sans ombres', shadows: 'ombres', ao: 'occlusion ambiante', aoHigh: 'occlusion ambiante complète',
       bloom: 'halo', reflections: 'reflets du ciel', noAA: 'sans anticrénelage' }
   };
@@ -88,7 +88,7 @@
         static: 'Ruhig', animated: 'Animiert', plain: 'Schlicht', detailed: 'Detailliert' },
       adaptive: 'Adaptive Auflösung', fps: 'Bildrate anzeigen',
       postFailed: 'Nachbearbeitung ist auf diesem Gerät nicht verfügbar; es wird ohne Effekte gerendert.',
-      gpuUnknown: 'Unbekannte GPU',
+      gpuUnknown: 'Unbekannte GPU', level: 'Stufe {n}',
       words: { noShadows: 'keine Schatten', shadows: 'Schatten', ao: 'Umgebungsverdeckung', aoHigh: 'volle Umgebungsverdeckung',
         bloom: 'Leuchteffekt', reflections: 'Himmelsspiegelungen', noAA: 'keine Kantenglättung' }
     },
@@ -108,7 +108,7 @@
         static: 'Parado', animated: 'Animado', plain: 'Simples', detailed: 'Detalhado' },
       adaptive: 'Resolução adaptável', fps: 'Mostrar taxa de quadros',
       postFailed: 'O pós-processamento não está disponível neste dispositivo; a imagem é exibida sem efeitos.',
-      gpuUnknown: 'GPU desconhecida',
+      gpuUnknown: 'GPU desconhecida', level: 'Nível {n}',
       words: { noShadows: 'sem sombras', shadows: 'sombras', ao: 'oclusão ambiente', aoHigh: 'oclusão ambiente completa',
         bloom: 'brilho', reflections: 'reflexos do céu', noAA: 'sem suavização' }
     },
@@ -122,7 +122,7 @@
         static: 'Fermo', animated: 'Animato', plain: 'Semplice', detailed: 'Dettagliato' },
       adaptive: 'Risoluzione adattiva', fps: 'Mostra frequenza fotogrammi',
       postFailed: 'La post-elaborazione non è disponibile su questo dispositivo; il rendering avviene senza effetti.',
-      gpuUnknown: 'GPU sconosciuta',
+      gpuUnknown: 'GPU sconosciuta', level: 'Livello {n}',
       words: { noShadows: 'senza ombre', shadows: 'ombre', ao: 'occlusione ambientale', aoHigh: 'occlusione ambientale completa',
         bloom: 'bagliore', reflections: 'riflessi del cielo', noAA: 'senza antialiasing' }
     }
@@ -231,7 +231,7 @@
       var s = saved();
       var info = api.info() || {};
       var detected = info.detected || 'balanced';
-      var r = G.resolve(s, detected);
+      var r = G.resolve(s, detected, info.level);
       preset.options[0].textContent = T.auto.replace('{tier}', T[detected]);
       preset.value = G.PRESETS.indexOf(s.preset) >= 0 ? s.preset : 'auto';
       var pct = Math.round(r.userScale * 100);
@@ -244,7 +244,8 @@
       });
       adaptive.checked = r.adaptive;
       fps.checked = r.showFps;
-      var parts = [info.gpu || T.gpuUnknown, G.describe(r, info.pixels && info.pixels[0] ? info.pixels : null, T.words)];
+      var parts = [info.gpu || T.gpuUnknown, info.level != null ? T.level.replace('{n}', info.level) : null,
+        G.describe(r, info.pixels && info.pixels[0] ? info.pixels : null, T.words)].filter(Boolean);
       summary.textContent = parts.join(' · ');
       note.hidden = !info.postFailed;
     }

@@ -348,6 +348,7 @@ async function graphicsPass(browser, name, ctxOpts) {
     if ((await preset()) !== 'low') throw new Error('low not applied');
     const lowSummary = await page.textContent('#gfx-summary');
     if (!/no shadows/.test(lowSummary)) throw new Error('low summary unexpected: ' + lowSummary);
+    if (!/ · Level 0 · /.test(lowSummary)) throw new Error('summary lacks the hardware level: ' + lowSummary);
     ok(`${name}: Low applied ("${lowSummary.trim()}")`);
 
     await page.selectOption('#gfx-preset', 'high');
