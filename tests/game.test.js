@@ -8,9 +8,9 @@
  * tie-break ordering, save checksum migration, server validation logic.
  */
 var assert = require('assert');
-var R = require('./rules');
-var C = require('./content');
-var S = require('./session');
+var R = require('../rules');
+var C = require('../content');
+var S = require('../session');
 
 var passed = 0;
 function test(name, fn) {
@@ -312,7 +312,7 @@ test('session: adoptProgress merges remote-preferred without losing local clears
   remote.bestScores[0] = 900;
   remote.counters.launches = 3; // local ahead on the counter
   remote.achievements['streak-3'] = true;
-  var R2 = require('./rules');
+  var R2 = require('../rules');
   remote.sum = R2.fnv1a(JSON.stringify({ v: remote.v, stars: remote.stars, achievements: remote.achievements, counters: remote.counters }));
   var adopted = sess.adoptProgress(remote);
   assert.strictEqual(adopted, true);
@@ -331,7 +331,7 @@ test('session: adoptProgress merges remote-preferred without losing local clears
 
 
 test('server: validateSubmission accepts honest replay, rejects cheats', function () {
-  var srv = require('./server');
+  var srv = require('../server');
   var lv = C.makeDaily(new Date());
   var st = R.createState(lv);
   R.applyCommand(st, { id: '1', type: 'launch', vx: 10, vy: 8 });

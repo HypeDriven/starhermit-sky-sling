@@ -7,3 +7,4 @@ spec.md
 LICENSE.md
 coverart.png
 sfx/manifest.md
+*.log

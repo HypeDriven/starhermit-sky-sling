@@ -302,22 +302,29 @@ function panel(L: Layout): void {
   const h = lastSize.get(key) ?? 0;
   const scroll = h > avail;
   const opening = f.frame - app.openedFrame <= 6;
+  // the panel's closing button stays pinned under a scrolling body (out-of-view widgets are not reachable)
+  const footer = FOOTERS[o];
+  const footH = footer ? 54 : 0;
+  const spacing = L.short ? 6 : 10;
   const open = ui.dialog(o, "", true, () => {
-    const body = (): void => {
+    ui.column(`${key}-box`, () => {
       const w = outer - 2 * padX - (scroll ? 14 : 0);
-      const r = ui.column(`${key}-col`, () => {
-        if (o === "title") titlePanel(w, L);
-        else if (o === "modes") modesPanel(w);
-        else if (o === "stages") stagesPanel(w);
-        else if (o === "help") helpPanel(w);
-        else if (o === "pause") pausePanel(w);
-        else if (o === "settings") settingsPanel(w);
-        else resultsPanel(w, L);
-      }, { style: "panel", width: outer - (scroll ? 14 : 0), spacing: L.short ? 6 : 10, align: "center", padding: { top: padY, bottom: padY, start: padX, end: padX } });
-      lastSize.set(key, r.height / L.sc);
-    };
-    if (scroll) ui.scrollArea(`${key}-scroll`, { width: outer, height: avail }, body, opening ? { scrollTo: { top: 0 } } : undefined);
-    else body();
+      const body = (): void => {
+        const r = ui.column(`${key}-col`, () => {
+          if (o === "title") titlePanel(w, L);
+          else if (o === "modes") modesPanel(w);
+          else if (o === "stages") stagesPanel(w);
+          else if (o === "help") helpPanel(w);
+          else if (o === "pause") pausePanel(w);
+          else if (o === "settings") settingsPanel(w);
+          else resultsPanel(w, L);
+        }, { width: w, spacing, align: "center" });
+        lastSize.set(key, r.height / L.sc + 2 * padY + (footer ? footH + spacing : 0));
+      };
+      if (scroll) ui.scrollArea(`${key}-scroll`, { width: w + 14, height: avail - 2 * padY - (footer ? footH + spacing : 0) }, body, opening ? { scrollTo: { top: 0 } } : undefined);
+      else body();
+      if (footer) button(footer());
+    }, { style: "panel", width: outer, spacing, align: "center", padding: { top: padY, bottom: padY, start: padX, end: padX } });
   });
   // Escape: the panel's way back (not on the frame it opened; the title and results stay)
   if (!open && fresh()) later(() => {
@@ -328,6 +335,12 @@ function panel(L: Layout): void {
     else if (o === "pause") actions.resume();
   });
 }
+const FOOTERS: Partial<Record<string, () => Btn>> = {
+  modes: () => ({ id: "btn-modes-back", text: T("Back"), act: actions.backTitle }),
+  stages: () => ({ id: "btn-stages-back", text: T("Back"), act: actions.backModes }),
+  help: () => ({ id: "btn-help-close", text: T("Close"), act: actions.closeHelp }),
+  settings: () => ({ id: "btn-settings-done", text: T("Done"), act: actions.closeSettings }),
+};
 function heading(cls: string, text: string, w: number, id?: string): void {
   if (textWidth(text, cls, "heading") <= w) (id ? ui.id(id) : ui).style(cls).heading(text);
   else (id ? ui.id(id) : ui).style(cls).paragraph(text, w);
@@ -370,7 +383,6 @@ function modesPanel(w: number): void {
       if (ui.style("mode-btn", { width: w }).id(`mode-${m.id}`).button(T(m.title), opts) && fresh()) later(m.act);
     }
   }, { width: w, spacing: 8 });
-  button({ id: "btn-modes-back", text: T("Back"), act: actions.backTitle });
 }
 function stagesPanel(w: number): void {
   const mode = app.gridMode;
@@ -403,7 +415,6 @@ function stagesPanel(w: number): void {
       }, { spacing: 8 });
     }
   }, { width: w, spacing: 8 });
-  button({ id: "btn-stages-back", text: T("Back"), act: actions.backModes });
 }
 function helpPanel(w: number): void {
   heading("panel-h2", T("How to play"), w, "help-h");
@@ -437,7 +448,6 @@ function helpPanel(w: number): void {
       }, { spacing: 10 });
     }
   }, { width: w, spacing: 10 });
-  button({ id: "btn-help-close", text: T("Close"), act: actions.closeHelp });
 }
 function cardHeight(h: string, p: string, w: number): number {
   const sc = ui.preferences().scale;
@@ -485,7 +495,6 @@ function settingsPanel(w: number): void {
     toggle("opt-lefty", N("Left-handed controls"), o.leftHanded, w - 28, (v) => platform.setOption("leftHanded", v));
     toggle("opt-assist", N("Timing assist (longer aim window)"), o.timingAssist, w - 28, (v) => platform.setOption("timingAssist", v));
   }, { style: "fieldset", width: w, spacing: 4 });
-  button({ id: "btn-settings-done", text: T("Done"), act: actions.closeSettings });
 }
 function resultsPanel(w: number, L: Layout): void {
   const r = app.results;

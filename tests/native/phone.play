@@ -1,0 +1,35 @@
+# Portrait phone (DPR 3) by finger: the mode list from the stage grid's Back, lesson 1 of Learn shot by swipes on the
+# island until its results (cleared or out of shots), then the next lesson. Swipes drag the sling back from anywhere.
+# viewport 390x844@3
+until 600 Daily Challenge
+frames 20
+touch =Journey
+until 120 Journey stages
+frames 10
+touch =Back
+until 120 Select a mode
+frames 10
+save phone-modes
+touch =Learn
+until 120 Drag back from the pouch and release.
+frames 30
+swipe 50% 50% 38% 53% 20
+frames 400
+swipe 50% 50% 36% 55% 20
+frames 400
+swipe 50% 50% 40% 52% 20
+frames 400
+swipe 50% 50% 34% 57% 20
+until 2000 points
+frames 20
+save phone-results
+expect Retry
+touch =Menu
+until 120 Daily Challenge
+frames 10
+touch =How to Play
+until 120 Materials
+frames 10
+save phone-help
+touch =Close
+until 120 Daily Challenge

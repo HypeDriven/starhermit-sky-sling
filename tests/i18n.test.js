@@ -1,22 +1,21 @@
 'use strict';
-// Localization coverage (node --test): every player-facing English key
-// (tests/i18n-keys.js: T()/N() calls, audio captions, data-i18n markup,
-// tutorial texts and achievement names) is translated in every non-English
-// locale with the same {placeholders}; the Graphics panel and StarHermit
-// chrome tables cover all nine locales; language switching notifies listeners.
+// Localization coverage (node --test): every player-facing English key the
+// engine client shows (tests/i18n-keys.js: T()/N() calls in native/*.ts, the
+// audio captions, tutorial texts and achievement names) is translated in
+// every non-English locale with the same {placeholders} and no unused rows;
+// the StarHermit account strings cover all nine locales; T falls back and
+// switches locale (the runtime's Options › Language drives it).
 var test = require('node:test');
 var assert = require('node:assert');
 var ALL = require('./i18n-keys.js').ALL;
 var I18N = require('../i18n.js');
-var G = require('../gfx');
-global.SkySling = { gfxui: require('../gfxui.js') };
 var SH = require('../sh-strings.js');
 
 function ph(s) { return (String(s).match(/\{(\w+)\}/g) || []).sort().join(','); }
 
 test('nine locales', function () {
   assert.deepStrictEqual(I18N.LOCALES, ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT']);
-  assert.ok(ALL.size > 120, 'only ' + ALL.size + ' keys');
+  assert.ok(ALL.size > 100, 'only ' + ALL.size + ' keys');
 });
 
 I18N.LOCALES.filter(function (l) { return l.indexOf('en-') !== 0; }).forEach(function (loc) {
@@ -36,12 +35,13 @@ test('help markup keeps its <kbd> keys in every locale', function () {
   I18N.LOCALES.slice(2).forEach(function (loc) { assert.ok(/<kbd>Space<\/kbd>/.test(I18N.DICTS[loc][key]), loc); });
 });
 
-test('Graphics panel and account strings cover all nine locales', function () {
-  assert.ok(G);
+test('account strings cover all nine locales', function () {
   I18N.LOCALES.forEach(function (loc) {
-    assert.strictEqual(global.SkySling.gfxui.pickLocale(loc), loc);
-    assert.ok(SH.strings(loc).signIn, loc);
+    assert.ok(SH.STRINGS[loc], loc);
+    assert.strictEqual(SH.strings(loc), SH.STRINGS[loc]);
+    assert.ok(SH.strings(loc).signIn && SH.strings(loc).lbRank.indexOf('{rank}') >= 0, loc);
   });
+  assert.strictEqual(SH.strings('xx-YY'), SH.STRINGS['en-US']);
   assert.notStrictEqual(SH.strings('de-DE').signIn, SH.strings('en-US').signIn);
 });
 
