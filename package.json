@@ -1,24 +1,20 @@
 {
   "name": "sky-sling",
   "version": "1.0.0",
-  "description": "Sky Sling — breezy island slingshot physics puzzle (browser game)",
-  "main": "server.js",
+  "private": true,
+  "description": "Sky Sling — breezy island slingshot physics puzzle on the StarHermit engine. CommonJS by default: server.js, the classic scripts (rules.js, content.js, session.js, progress.js, i18n.js, locales/) and the node tests; dev tools are .mjs.",
   "scripts": {
-    "test": "node test.js && node tests/platform.test.js && node --test tests/gfx.test.js tests/i18n.test.js",
-    "test:e2e": "node tests/e2e.mjs",
+    "test": "npm run test:unit && npm run test:native",
+    "test:unit": "node --test tests/game.test.js tests/progress.test.js tests/i18n.test.js",
+    "test:native": "node tests/native.mjs",
+    "test:browser": "node tools/browser-play.mjs .",
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs",
+    "plays": "node tools/gen-plays.mjs",
     "start": "node server.js"
   },
-  "keywords": [
-    "game",
-    "physics",
-    "puzzle",
-    "slingshot"
-  ],
-  "author": "",
+  "keywords": ["game", "physics", "puzzle", "slingshot"],
   "license": "SEE LICENSE IN LICENSE.md",
-  "dependencies": {
-    "three": "^0.185.0"
-  },
   "devDependencies": {
     "playwright-core": "^1.62.1"
   }
