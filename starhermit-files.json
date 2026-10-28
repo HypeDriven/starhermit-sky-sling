@@ -5,7 +5,7 @@
     "cover.jpg": {"sha256": "e6d0f27bc201a7c395012a121eef57b519f73e94a8d1c21b7e868fd75f1de50b", "size": 242227},
     "i18n.js": {"sha256": "ca575c62f3e04ec14d2db18287a75ed29d79081f2d47ec7eb31239da2001591a", "size": 4604},
     "icon.png": {"sha256": "687e1897e23f1222d39ad8fa48cabdf1a657ec64bdbc5f6687d09a96211f7351", "size": 8355},
-    "index.html": {"sha256": "b862011d993386d11a7637fc1995a886e29bc1b15dd9add3be675bf74b3788d3", "size": 1754},
+    "index.html": {"sha256": "15ab7036fb860f2d188db796a09a2ac91c78dcaa2b0ca0dfe14845895f84c645", "size": 1754},
     "locales/de.js": {"sha256": "6c83b6add5cca60693f5df161e0869d18bcba71099ef1982b956d413cf83f4e7", "size": 7572},
     "locales/en-GB.js": {"sha256": "938966dbe9a2d7b2cf3cd2bdeb5411c12aba6ed4b58e17acbabf13b2d870cabd", "size": 356},
     "locales/es.js": {"sha256": "3a2e1b00ffdfff6d23bec240005b23b54568e3802f6467908e2af9c40acb0d18", "size": 9029},
@@ -41,7 +41,7 @@
     "sfx/wood-crack.opus": {"sha256": "2cdf5620dd0ec7b503e8af9f620117e85e1645021c1846625aeb851e7b713cca", "size": 21306},
     "sfx/wood-tumble.opus": {"sha256": "aaa67e1e8c7733f221a119095d63524aa1529747fdc8c83ebaa26a34c2552335", "size": 31240},
     "sh-strings.js": {"sha256": "7d8e92e85cbe9fe9def1e93925c1bf15b1f8647d5ecad754d083feb12e20daf2", "size": 3960},
-    "starhermit.txt": {"sha256": "4aaef3d6b1f925bfd3884b2377a480661a15f44f44b2207806f7078fb9eb4eb1", "size": 1896}
+    "starhermit.txt": {"sha256": "b468c095b3e3405194e4b323ed64f70b50f1d0af9d1c8d3f3c2c3296c421eccb", "size": 1896}
   },
   "excluded": ["LICENSE.md", "coverart.png", "node_modules/", "npm-install.log", "package-lock.json", "package.json", "server.js", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
