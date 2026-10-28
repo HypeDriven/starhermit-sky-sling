@@ -1,16 +1,46 @@
 name=Sky Sling
 description=Launch characters with a slingshot, topple structures, and complete each challenge with limited shots.
-launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=score-script.js
 version=1.0.0
 cover=cover.jpg
-control.aimLeft=ArrowLeft | Aim: less power
-control.aimRight=ArrowRight | Aim: more power
-control.aimUp=ArrowUp | Aim higher
-control.aimDown=ArrowDown | Aim lower
-control.launch=Space+Enter | Launch
+
+# StarHermit engine script game: one package, played natively by the
+# StarHermit client and in browsers by the engine's web runtime. Browsers open
+# launch=index.html, the loader `npm run package` writes (it pins the engine
+# on wiki.starhermit.com by hash; never edit it). Re-run `npm run package`
+# after every change and commit index.html + starhermit-files.json.
+launch=index.html
+engine.api=1
+engine.entry=native/main.ts
+engine.version=1.20.1
+engine.minor=20
+engine.capabilities=platform,storage,clipboard
+
+# Keyboard actions (players rebind keys and pads in the runtime's Options).
+# Dragging back anywhere on the island with the mouse or a finger aims the
+# sling (the dotted arc previews the shot); releasing launches.
+engine.group.aim_left=Aim
+control.aim_left=ArrowLeft | Aim: less power
+control.aim_right=ArrowRight | Aim: more power
+control.aim_up=ArrowUp | Aim higher
+control.aim_down=ArrowDown | Aim lower
+control.launch=Space+Enter+NumpadEnter | Launch
+engine.group.pause=Round
 control.pause=Escape+KeyP | Pause / resume
 control.skip=KeyS | Fast-forward
 control.restart=KeyR | Restart level
 control.undo=KeyU | Undo (practice)
+
+# Gamepad defaults (the browser build had none): the D-pad or left stick aims,
+# South launches, Start pauses, the right shoulder fast-forwards a shot, West
+# undoes in Practice, Select restarts.
+engine.gamepad.aim_left=DpadLeft+LeftStickLeft
+engine.gamepad.aim_right=DpadRight+LeftStickRight
+engine.gamepad.aim_up=DpadUp+LeftStickUp
+engine.gamepad.aim_down=DpadDown+LeftStickDown
+engine.gamepad.launch=South
+engine.gamepad.pause=Start
+engine.gamepad.skip=RightShoulder
+engine.gamepad.undo=West
+engine.gamepad.restart=Select

@@ -22,7 +22,7 @@
       fr: require('./locales/fr.js'), pt: require('./locales/pt.js'), it: require('./locales/it.js'),
     });
   } else { root.SkySling = root.SkySling || {}; root.SkySling.i18n = factory(root, root.SkySlingLocales || {}); }
-})(typeof self !== 'undefined' ? self : this, function (root, L) {
+})(typeof self !== 'undefined' ? self : globalThis, function (root, L) {
   'use strict';
   const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'];
   const es = L.es || {}, fr = L.fr || {};

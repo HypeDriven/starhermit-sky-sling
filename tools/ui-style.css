@@ -1,0 +1,104 @@
+/* Sky Sling — the browser build's style.css rewritten class-based for the
+   engine's UI (`npm run css` converts it into assets/ui-style.json). Element
+   selectors, ids, attribute selectors and @media do not convert: every widget
+   names its classes and the breakpoints are layouts picked in
+   native/screens.ts (portrait phones: the rails side by side under the
+   playfield; compact: smaller rails at the bottom corners; landscape phones a
+   tighter HUD and panels). body.high-contrast is a token set in
+   native/style.ts, applied while the runtime's high-contrast option is on;
+   body.large-text is the runtime's text size and ui-scale.js its UI scale;
+   body.left-handed swaps the rails (native/screens.ts). */
+
+:root {
+  --panel-bg: #121c26eb;
+  --panel-fg: #eef4f8;
+  --accent: #ff8c5a;
+  --accent-2: #ffd166;
+  --dim: #9fb2c0;
+  --btn-bg: #24384a;
+  --btn-bg-hover: #31506a;
+  --focus-ring: #ffd166;
+  --chip-bg: #0c162299;
+  --rule-bg: #ffffff0f;
+  --divider: #ffffff26;
+  --toast-bg: #101c2cf0;
+}
+
+* { box-sizing: border-box; }
+
+/* ------------------------------------------------------------- text */
+.text { color: var(--panel-fg); font-size: 16px; }
+.dim { color: var(--dim); font-size: 13.6px; }
+.accent { color: var(--accent-2); font-size: 16px; }
+.big { color: var(--panel-fg); font-size: 25.6px; font-weight: 700; }
+.hud-title { color: var(--panel-fg); font-size: 17.6px; font-weight: 700; text-shadow: 0 1px 3px #00000099; }
+.chip-mode-text { color: var(--accent-2); font-size: 13.6px; }
+.chip-dim-text { color: var(--dim); font-size: 12.8px; }
+.hint-text { color: #ffffff; font-size: 14.4px; text-shadow: 0 1px 3px #000000b3; }
+.rail-h { color: var(--accent-2); font-size: 15.2px; font-weight: 700; }
+.rail-text { color: var(--panel-fg); font-size: 16px; }
+.rail-big { color: var(--panel-fg); font-size: 25.6px; font-weight: 700; }
+.title-h1 { color: var(--accent-2); font-size: 35.2px; font-weight: 700; text-align: center; }
+.panel-h2 { color: var(--accent-2); font-size: 24px; font-weight: 700; text-align: center; }
+.sub { color: var(--dim); font-size: 16px; text-align: center; }
+.mode-strong { color: var(--panel-fg); font-size: 16.8px; font-weight: 700; }
+.mode-small { color: var(--dim); font-size: 13.3px; }
+.rule-h3 { color: var(--accent); font-size: 18.7px; font-weight: 700; }
+.rule-p { color: var(--panel-fg); font-size: 14.4px; }
+.legend { color: var(--panel-fg); font-size: 16px; font-weight: 700; }
+.level-num { color: var(--panel-fg); font-size: 14.4px; text-align: center; }
+.level-stars { color: var(--accent-2); font-size: 12px; text-align: center; }
+.res-stars { color: var(--accent-2); font-size: 25.6px; text-align: center; }
+.res-score { color: var(--panel-fg); font-size: 25.6px; font-weight: 700; text-align: center; }
+.cell { color: var(--panel-fg); font-size: 16px; }
+.cell-num { color: var(--panel-fg); font-size: 16px; text-align: end; }
+.board-h { color: var(--panel-fg); font-size: 15.2px; font-weight: 700; }
+.board-me { color: var(--accent-2); font-size: 13.6px; font-weight: 700; }
+.toast-text { color: #f2f6fb; font-size: 14px; text-align: center; }
+
+/* ------------------------------------------------------------- surfaces */
+.chip { background: var(--chip-bg); border-radius: 6px; padding: 3px 8px; }
+/* portrait phones: the top bar and bottom tray get a panel backing */
+.bar { background: var(--panel-bg); border-radius: 0; }
+.rail { background: var(--panel-bg); border-radius: 10px; padding: 10px 14px; }
+.divider { background: var(--divider); border-radius: 0; }
+.panel { background: var(--panel-bg); border-radius: 14px; padding: 24px 28px; box-shadow: 0 12px 40px #00000080; }
+.rule-card { background: var(--rule-bg); border-radius: 8px; padding: 10px 12px; }
+.fieldset { border: 1px solid #ffffff33; border-radius: 8px; padding: 8px 12px; }
+.toast { background: var(--toast-bg); border-radius: 10px; padding: 10px 16px; box-shadow: 0 6px 20px #00000059; }
+.page-bg { background: #0e1a26; border-radius: 0; }
+
+/* ------------------------------------------------------------- buttons */
+.btn {
+  min-width: 44px; min-height: 44px; padding: 8px 16px;
+  background: var(--btn-bg); border: 2px solid #00000000; border-radius: 10px;
+  color: var(--panel-fg); font-size: 16px; text-align: center;
+}
+.btn:hover { background: var(--btn-bg-hover); }
+.btn:disabled { opacity: 0.45; }
+.btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.btn-primary {
+  min-width: 44px; min-height: 44px; padding: 8px 16px;
+  background: var(--accent); border: 2px solid #00000000; border-radius: 10px;
+  color: #1a1005; font-size: 16px; font-weight: 700; text-align: center;
+}
+.btn-primary:hover { background: #ff9d72; }
+.btn-primary:disabled { opacity: 0.45; }
+.btn-primary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+/* .mode-list button: a full-width left-aligned row with a title and a description */
+.mode-btn {
+  min-height: 44px; padding: 8px 16px;
+  background: var(--btn-bg); border: 2px solid #00000000; border-radius: 10px;
+  color: var(--panel-fg); font-size: 16px; text-align: start;
+}
+.mode-btn:hover { background: var(--btn-bg-hover); }
+.mode-btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+/* #level-grid button */
+.level-btn {
+  min-height: 56px; min-width: 44px; padding: 4px;
+  background: var(--btn-bg); border: 2px solid #00000000; border-radius: 10px;
+  color: var(--panel-fg); font-size: 14.4px; text-align: center;
+}
+.level-btn:hover { background: var(--btn-bg-hover); }
+.level-btn:disabled { opacity: 0.35; }
+.level-btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

@@ -2,8 +2,8 @@
 
 /*
  * Sky Sling - localized strings for the StarHermit account controls
- * (sign-in, invite link, sign-out notice, leaderboard line). boot.js asks for
- * the game language (i18n.js); tags are matched by the Graphics panel's picker.
+ * (sign-in, invite link, sign-out notice, leaderboard line) in the game
+ * language (i18n.js's locale tag).
  */
 (function (root) {
   var EN = {
@@ -77,11 +77,8 @@
       lbNotPosted: 'Punteggio non inviato alla classifica.'
     }
   };
-  function strings(lang) {
-    var ss = root.SkySling || {};
-    var key = ss.gfxui ? ss.gfxui.pickLocale(lang) : 'en-US';
-    return STRINGS[key] || EN;
-  }
+  /** The table for one of the nine locale tags (i18n.js LOCALES); others get US English. */
+  function strings(lang) { return STRINGS[lang] || EN; }
   var api = { STRINGS: STRINGS, strings: strings };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.SkySling = root.SkySling || {};

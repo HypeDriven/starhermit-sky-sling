@@ -159,10 +159,10 @@
   };
 
   // ---- round lifecycle --------------------------------------------------------
-  // mode: learn|journey|daily|practice|challenge ; ref: level index or lesson
+  // mode: learn|journey|daily|practice|challenge ; ref: level index or lesson (daily: the day's Date, platform clock)
   Session.prototype.startRound = function (mode, ref) {
     this.mode = mode;
-    if (mode === 'daily') this.level = C.makeDaily();
+    if (mode === 'daily') this.level = C.makeDaily(ref instanceof Date ? ref : undefined);
     else if (mode === 'learn') {
       var lesson = C.LESSONS[ref || 0];
       this.level = C.getLevel(lesson.levelIndex);
