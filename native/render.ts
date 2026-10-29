@@ -15,8 +15,8 @@
 // the bird bob, and drift the clouds; reduced motion stops all of it and the
 // impact effects.
 //
-// From three.js r185: light intensities are r185's ÷ π (the engine's
-// convention); the sky reflections (a PMREM of the theme's sky dome and sun,
+// From three.js r185: light intensities as the page wrote them (engine.minor
+// 23+); the shadow box is the page's fitted ortho box; the sky reflections (a PMREM of the theme's sky dome and sun,
 // pmrem.fromScene of a small scene in the browser build — the engine takes
 // only RoomEnvironment there) are an equirectangular float image of the same
 // dome and sun, prefiltered with fromEquirectangular, at the old
@@ -34,7 +34,7 @@ import {
   ConeGeometry, CylinderGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, DoubleSide, EquirectangularReflectionMapping,
   FloatType, Fog, Group, HemisphereLight, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial,
   MeshStandardMaterial, NoColorSpace, PerspectiveCamera, PlaneGeometry, PMREMGenerator, Quaternion, RepeatWrapping, RGBAFormat,
-  RoundedBoxGeometry, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TorusGeometry, Vector2, Vector3, mergeGeometries,
+  RoundedBoxGeometry, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TorusGeometry, type OrthographicCamera, Vector2, Vector3, mergeGeometries,
   renderer, scene, type BufferGeometry, type Material, type Object3D, type Texture,
 } from "starhermit:scene";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
@@ -54,17 +54,39 @@ camera.position.set(CAM.lookX, CAM.y, CAM.z);
 camera.lookAt(CAM.lookX, CAM.lookY, 0);
 
 // lighting: one dominant key, soft sky fill and a warm back/rim light from the visible sun
-const hemi = new HemisphereLight(0xdff2ff, 0x8a7a5a, 0.8 / PI);
-const key = new DirectionalLight(0xfff2dd, 1.7 / PI);
+const hemi = new HemisphereLight(0xdff2ff, 0x8a7a5a, 0.8);
+const key = new DirectionalLight(0xfff2dd, 1.7);
 key.position.set(-8, 14, 10);
 key.target.position.set(12, 3, 0);
 key.shadow.bias = -0.0004;
-// three's 0.03-world-unit normal bias over the old 40-unit play box at 2048² is ~1.5 texels.
-key.shadow.normalBias = 1.5;
-const rim = new DirectionalLight(0xffe0b0, 0.12 / PI);
+key.shadow.normalBias = 0.03;
+const rim = new DirectionalLight(0xffe0b0, 0.12);
 rim.target.position.set(12, 2, 0);
 rim.position.copy(SUN_POS).sub(rim.target.position).normalize().multiplyScalar(40).add(rim.target.position);
 scene.add(hemi, key, key.target, rim, rim.target);
+fitShadow();
+
+/** render.js _fitShadow: the orthographic shadow camera fitted tightly around the play volume as seen from the key light. */
+function fitShadow(): void {
+  const PLAY_BOX = { minX: -8, maxX: 31, minY: -0.5, maxY: 12, minZ: -6, maxZ: 6 };
+  const dir = key.position.clone().sub(key.target.position).normalize();
+  const eye = key.target.position.clone().add(dir.multiplyScalar(60));
+  const view = new Matrix4().lookAt(eye, key.target.position, new Vector3(0, 1, 0));
+  view.setPosition(eye);
+  view.invert();
+  const b = PLAY_BOX, v = new Vector3();
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (const x of [b.minX, b.maxX]) for (const y of [b.minY, b.maxY]) for (const z of [b.minZ, b.maxZ]) {
+    v.set(x, y, z).applyMatrix4(view);
+    for (let i = 0; i < 3; i++) { const c = i === 0 ? v.x : i === 1 ? v.y : v.z; mn[i] = Math.min(mn[i]!, c); mx[i] = Math.max(mx[i]!, c); }
+  }
+  key.position.copy(eye);
+  const cam = key.shadow.camera as OrthographicCamera;
+  cam.left = mn[0]! - 0.5; cam.right = mx[0]! + 0.5;
+  cam.bottom = mn[1]! - 0.5; cam.top = mx[1]! + 0.5;
+  cam.near = Math.max(0.5, -mx[2]! - 2); cam.far = -mn[2]! + 2;
+  cam.updateProjectionMatrix();
+}
 
 let look: Look | null = null;
 let level: Level | null = null;
@@ -378,7 +400,7 @@ function applyReflections(): void {
   const on = !!look && look.reflections;
   scene.environment = on ? envFor(theme) : null;
   scene.environmentIntensity = 0.55;
-  hemi.intensity = (on ? 0.5 : 0.8) / PI;
+  hemi.intensity = on ? 0.5 : 0.8;
 }
 
 // ---------------------------------------------------------------- the look
@@ -866,8 +888,6 @@ function fitCamera(view: ViewRect, w: number, h: number): void {
   camera.lookAt(CAM.lookX, CAM.lookY, 0);
   camera.setViewOffset(view.width, view.height, -view.x, -view.y, w, h);
   camera.updateProjectionMatrix();
-  // the old shadow frustum covered the play box (x −8 … 31) seen from the key light
-  key.shadow.distance = dist + 30;
 }
 /** Whether the island draws (always: it is the backdrop of every menu too). */
 export function setActive(on: boolean): void { renderer.camera = on ? camera : null; }
