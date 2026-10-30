@@ -5,7 +5,7 @@
     "cover.jpg": {"sha256": "e6d0f27bc201a7c395012a121eef57b519f73e94a8d1c21b7e868fd75f1de50b", "size": 242227},
     "i18n.js": {"sha256": "ca575c62f3e04ec14d2db18287a75ed29d79081f2d47ec7eb31239da2001591a", "size": 4604},
     "icon.png": {"sha256": "687e1897e23f1222d39ad8fa48cabdf1a657ec64bdbc5f6687d09a96211f7351", "size": 8355},
-    "index.html": {"sha256": "7f5ac36e32426d6cc25fd63500592c4df7504d95154d0fc0418ed11c764f80aa", "size": 1774},
+    "index.html": {"sha256": "6dc60b785ddb320d7cfeb73ae107967322eda2477e20e0f4ba94659b8533ef3e", "size": 1774},
     "locales/de.js": {"sha256": "6c83b6add5cca60693f5df161e0869d18bcba71099ef1982b956d413cf83f4e7", "size": 7572},
     "locales/en-GB.js": {"sha256": "938966dbe9a2d7b2cf3cd2bdeb5411c12aba6ed4b58e17acbabf13b2d870cabd", "size": 356},
     "locales/es.js": {"sha256": "3a2e1b00ffdfff6d23bec240005b23b54568e3802f6467908e2af9c40acb0d18", "size": 9029},
@@ -18,7 +18,7 @@
     "native/main.ts": {"sha256": "92a89caacf752b311e5f3d06292c5d7e3e9de6b80a9203ffdaf22d480a73b88e", "size": 19336},
     "native/platform.ts": {"sha256": "df24082665e634842666888580d641a985bf6d76af64bc05064790257632613d", "size": 10627},
     "native/quality.ts": {"sha256": "87221bc9e2956754907ea3db37df2e315bd353f583b55b095141bcb2e1655ee8", "size": 3703},
-    "native/render.ts": {"sha256": "befb46100f830b334f2ed23f41233018a49cfb0ddaad6e47545f68b9836d9292", "size": 46128},
+    "native/render.ts": {"sha256": "2e4660f6f0481d56156ecf845c5231076aa4a9e3d72ba08c5519f3772f4f01eb", "size": 46154},
     "native/screens.ts": {"sha256": "5542f032bdd2275d06fcace4b5034a64bb914a279278ffdeddbc485f2b60ac27", "size": 30354},
     "native/style.ts": {"sha256": "08e07f91d8a37635d8ea75052b08ca95a98d10bb5ceefb1f9dabf06b446579a7", "size": 2432},
     "progress.js": {"sha256": "6f532c26cf94ea7f8a1004021bfee7067f33dd5eb7d89df3497b44fee6314ff6", "size": 5626},
@@ -41,7 +41,7 @@
     "sfx/wood-crack.opus": {"sha256": "2cdf5620dd0ec7b503e8af9f620117e85e1645021c1846625aeb851e7b713cca", "size": 21306},
     "sfx/wood-tumble.opus": {"sha256": "aaa67e1e8c7733f221a119095d63524aa1529747fdc8c83ebaa26a34c2552335", "size": 31240},
     "sh-strings.js": {"sha256": "7d8e92e85cbe9fe9def1e93925c1bf15b1f8647d5ecad754d083feb12e20daf2", "size": 3960},
-    "starhermit.txt": {"sha256": "0cbcc4f04eca03d5bda45fe17b4e49bb39cada2fbec2c01a977d0c49ea76e501", "size": 1896}
+    "starhermit.txt": {"sha256": "085d3871c6fbef09b7062cd051ce282d2f27ab676ed0cf84c0deebe5d1bda6b6", "size": 1896}
   },
   "excluded": ["LICENSE.md", "coverart.png", "node_modules/", "npm-install.log", "package-lock.json", "package.json", "server.js", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1

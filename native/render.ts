@@ -424,10 +424,10 @@ export function applyLook(next: Look): void {
   };
   // UnrealBloomPass(0.25, 0.3, 0.92) before the output pass (linear light): only the sun, glints and bright highlights bloom.
   renderer.bloom = next.bloom ? { strength: 0.25, radius: 0.3, threshold: 0.92, resolution: b.bloomRes } : null;
-  // render.js GradeShader after the output pass (display space): a 0.18 S-curve (slope 1.09 at mid grey), saturation 1.1,
+  // render.js GradeShader after the output pass (display space): a 0.18 smoothstep S-curve (contrastCurve "s"), saturation 1.1,
   // cool shadows / warm highlights over smoothstep(0.25, 0.85) of luma, the 0.2 vignette over smoothstep(0.4, 0.9).
   renderer.grade = next.grade ? {
-    space: "display", contrast: 0.09, saturation: 1.1, shadows: [0.97, 0.99, 1.04], highlights: [1.03, 1.0, 0.96], split: [0.25, 0.85],
+    space: "display", contrastCurve: "s", contrast: 0.18, saturation: 1.1, shadows: [0.97, 0.99, 1.04], highlights: [1.03, 1.0, 0.96], split: [0.25, 0.85],
     vignette: { amount: 0.2, inner: 0.4, outer: 0.9 },
   } : null;
   renderer.antialias = next.antialias;
