@@ -62,7 +62,7 @@ Every transition has one owner and an explicit reason. Backgrounding pauses solo
 
 ## 3. Implementation on the StarHermit engine
 
-Sky Sling is a StarHermit engine **script game** (TypeScript on host API 1.31), pinned in `starhermit.txt` to the published engine 1.29.0 with `engine.minor=31` (three.js r185 parity) and the capabilities `platform`, `storage` and `clipboard`. The same package plays natively in the StarHermit client and in browsers through the engine's web runtime: `launch=index.html` is the loader `npm run package` writes (with `starhermit-files.json`, the file index), so both are regenerated after every change.
+Sky Sling is a StarHermit engine **script game** (TypeScript on host API 1.32), pinned in `starhermit.txt` to the published engine 1.30.0 with `engine.minor=32` (three.js r185 parity) and the capabilities `platform`, `storage` and `clipboard`. The same package plays natively in the StarHermit client and in browsers through the engine's web runtime: `launch=index.html` is the loader `npm run package` writes (with `starhermit-files.json`, the file index), so both are regenerated after every change.
 
 ### Files
 
