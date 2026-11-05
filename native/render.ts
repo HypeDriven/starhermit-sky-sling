@@ -34,7 +34,7 @@ import {
   ConeGeometry, CylinderGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, DoubleSide, EquirectangularReflectionMapping,
   FloatType, Fog, Group, HemisphereLight, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial,
   MeshStandardMaterial, NoColorSpace, PerspectiveCamera, PlaneGeometry, PMREMGenerator, Quaternion, RepeatWrapping, RGBAFormat,
-  RoundedBoxGeometry, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TorusGeometry, type OrthographicCamera, Vector2, Vector3, mergeGeometries,
+  RoundedBoxGeometry, SphereGeometry, ParticleEmitter, Sprite, SpriteMaterial, SRGBColorSpace, TorusGeometry, type OrthographicCamera, Vector2, Vector3, mergeGeometries,
   renderer, scene, type BufferGeometry, type Material, type Object3D, type Texture,
 } from "starhermit:scene";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
@@ -416,14 +416,13 @@ export function applyLook(next: Look): void {
   }
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
-  const b = next.budget;
-  const hi = next.ao === "high";
-  renderer.ao = next.ao === "off" ? null : {
-    blendIntensity: 0.75, radius: 0.9, distanceExponent: 1.5, thickness: 1.2, scale: 1.0, samples: hi ? 16 : 8, resolution: b.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: hi ? 16 : 8, radiusExponent: 2 },
+  const ao = next.ao, hi = !!ao && ao.resolution >= 1; // the engine's AO quality: resolution under 1 is "on", 1 is "high"
+  renderer.ao = !ao ? null : {
+    blendIntensity: 0.75, radius: 0.9, distanceExponent: 1.5, thickness: 1.2, scale: 1.0, samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // UnrealBloomPass(0.25, 0.3, 0.92) before the output pass (linear light): only the sun, glints and bright highlights bloom.
-  renderer.bloom = next.bloom ? { strength: 0.25, radius: 0.3, threshold: 0.92, resolution: b.bloomRes } : null;
+  renderer.bloom = next.bloom !== null ? { strength: 0.25, radius: 0.3, threshold: 0.92, resolution: next.bloom } : null;
   // render.js GradeShader after the output pass (display space): a 0.18 smoothstep S-curve (contrastCurve "s"), saturation 1.1,
   // cool shadows / warm highlights over smoothstep(0.25, 0.85) of luma, the 0.2 vignette over smoothstep(0.4, 0.9).
   renderer.grade = next.grade ? {
@@ -447,6 +446,7 @@ function disposeScene(): void {
   if (arcDots[0]) { arcDots[0].geometry.dispose(); (arcDots[0].material as Material).dispose(); }
   arcDots = [];
   for (const e of effects) { scene.remove(e.group); for (const m of e.mats) m.dispose(); }
+  for (const e of sparkEmitters.values()) e.clear();
   effects = [];
   animated = [];
   clouds = [];
@@ -833,7 +833,27 @@ export function sync(state: State): void {
   });
   state.targets.forEach((t, j) => { const g = targetMeshes[j]; if (g) g.visible = t.alive; });
 }
-/** A bounded, seeded impact effect. kind: impact | block | pop; mat tints debris. */
+/** The sparks of an impact kind at one size (a native emitter; one color and life each). */
+const sparkEmitters = new Map<string, ParticleEmitter>();
+function sparkEmitter(k: "impact" | "block" | "pop", size: number): ParticleEmitter {
+  const key = `${k}:${size}`;
+  let e = sparkEmitters.get(key);
+  if (!e) {
+    sharedFx ??= { spark: new SphereGeometry(1, 6, 4), chunk: new BoxGeometry(1, 1, 1), puff: new SphereGeometry(1, 12, 8) };
+    e = new ParticleEmitter({
+      capacity: 256, seed: sparkEmitters.size + 1, geometry: sharedFx.spark, size,
+      material: new MeshBasicMaterial({ transparent: true, depthWrite: false }),
+      color: k === "pop" ? new Color(0.9, 1.6, 0.6) : new Color(1.6, 1.45, 1.1),
+      life: k === "impact" ? 0.6 : 0.9, opacity: [1, 0],
+      velocity: [0, 2.75, 0], velocitySpread: [3.5, 2.75, 0], gravity: [0, -Rules.GRAVITY * 0.6, 0],
+    });
+    e.frustumCulled = false;
+    scene.add(e);
+    sparkEmitters.set(key, e);
+  }
+  return e;
+}
+/** A bounded, seeded impact effect (the sparks native; debris and the puff, with their own shapes, spin and growth, here). kind: impact | block | pop; mat tints debris. */
 export function spawnImpact(x: number, y: number, big: boolean, m: Mat | null = null, kind?: "impact" | "block" | "pop"): void {
   if (!look || reducedMotion) return;
   const high = look.particles === "high";
@@ -842,17 +862,12 @@ export function spawnImpact(x: number, y: number, big: boolean, m: Mat | null = 
   const group = new Group();
   const parts: Mesh[] = [], mats: Effect["mats"] = [];
   const rnd = Rules.mulberry32(((x * 131 + y * 57) | 0) >>> 0); // seeded cosmetic variants
-  const sparkMat = new MeshBasicMaterial({ color: k === "pop" ? new Color(0.9, 1.6, 0.6) : new Color(1.6, 1.45, 1.1), transparent: true, depthWrite: false });
-  mats.push(sparkMat);
   const nSpark = Math.max(2, Math.round(look.budget.sparks * (k === "impact" ? 0.5 : 1) * (high ? 1 : 0.4)));
-  for (let i = 0; i < nSpark; i++) {
-    const p = new Mesh(sharedFx.spark, sparkMat);
-    p.scale.setScalar(0.05 + rnd() * 0.06);
-    p.position.set(x, y, 0.2);
-    vel.set(p, { vx: (rnd() - 0.5) * 7, vy: rnd() * 5.5, g: 0.6, spin: 0, puff: false });
-    group.add(p); parts.push(p);
-  }
-  if (high && k !== "impact") {
+  // two spark sizes: an emitter's instances share one scale (the old 0.05 to 0.11 per spark)
+  sparkEmitter(k, 0.065).burst(nSpark >> 1, [x, y, 0.2]);
+  sparkEmitter(k, 0.095).burst(nSpark - (nSpark >> 1), [x, y, 0.2]);
+  if (!(high && k !== "impact")) return;
+  {
     const chunkMat = mat({ color: k === "pop" ? 0x5da83a : MAT_COLORS[m ?? "wood"] ?? MAT_COLORS.wood, roughness: 0.7, transparent: true });
     mats.push(chunkMat);
     for (let c = 0; c < 8; c++) {
@@ -872,7 +887,7 @@ export function spawnImpact(x: number, y: number, big: boolean, m: Mat | null = 
     group.add(puff); parts.push(puff);
   }
   scene.add(group);
-  effects.push({ group, parts, mats, age: 0, life: k === "impact" ? 0.6 : 0.9 });
+  effects.push({ group, parts, mats, age: 0, life: 0.9 });
 }
 let sharedFx: { spark: BufferGeometry; chunk: BufferGeometry; puff: BufferGeometry } | null = null;
 
@@ -913,9 +928,8 @@ export function update(dt: number, w: number, h: number, view: ViewRect): void {
       p.position.y += u.vy * dt;
       if (u.spin) { p.rotation.z += u.spin * dt; p.rotation.x += u.spin * 0.6 * dt; }
     }
-    e.mats[0]!.opacity = k;
-    if (e.mats[1]) e.mats[1].opacity = Math.min(1, k * 2);
-    if (e.mats[2]) e.mats[2].opacity = 0.5 * k;
+    e.mats[0]!.opacity = Math.min(1, k * 2);
+    e.mats[1]!.opacity = 0.5 * k;
     if (e.age >= e.life) {
       scene.remove(e.group);
       for (const m of e.mats) m.dispose();

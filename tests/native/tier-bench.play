@@ -1,0 +1,26 @@
+# Graphics-level bench: Practice stage 9, one shot into the structure (sparks, debris), 600 frames of the island.
+until 600 Daily Challenge
+frames 20
+click =Journey
+until 120 Journey stages
+frames 10
+click =Back
+until 120 Select a mode
+frames 10
+click =Practice
+until 120 Practice stages
+frames 10
+click =Stage 9
+until 120 Collapse every Bumble
+frames 20
+key ArrowLeft 1
+key ArrowDown 1
+key ArrowDown 1
+key ArrowDown 1
+key ArrowDown 1
+key ArrowDown 1
+frames 120
+measure start
+key Space 1
+frames 600
+measure stop

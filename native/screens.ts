@@ -24,10 +24,8 @@ import { token } from "./style.ts";
 // ------------------------------------------------------------------ layout
 interface Layout { lw: number; lh: number; sc: number; wide: boolean; phone: boolean; short: boolean; tiny: boolean }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const sc = v.scale, lw = Math.max(1, v.width), lh = Math.max(1, v.height);
   return { lw, lh, sc, wide: lw >= 1024, phone: lw <= 640 && lh > lw, short: lh <= 500 && lw > lh, tiny: lw <= 420 };
 }
 const lastSize = new Map<string, number>();
@@ -53,20 +51,9 @@ function button(b: Btn, width: number | null = null): void {
 }
 /** Buttons at their own widths in centred rows that wrap at `width` (.panel .row: flex-wrap, gap 10). */
 function flow(label: string, list: Btn[], width: number, gap = 10): void {
-  const rows: Btn[][] = [[]];
-  let used = 0;
-  const bw = (b: Btn): number => Math.min(width, buttonWidth(b.text, b.style ?? "btn"));
-  for (const b of list) {
-    const w = bw(b);
-    if (rows[rows.length - 1]!.length && used + gap + w > width) { rows.push([]); used = 0; }
-    used += (rows[rows.length - 1]!.length ? gap : 0) + w;
-    rows[rows.length - 1]!.push(b);
-  }
-  ui.column(label, () => {
-    rows.forEach((row, ri) => ui.row(`${label}-r${ri}`, () => {
-      for (const b of row) button(b, bw(b) >= width ? width : null);
-    }, { spacing: gap, width, justify: "center" }));
-  }, { spacing: gap, width });
+  ui.row(label, () => {
+    for (const b of list) button(b, buttonWidth(b.text, b.style ?? "btn") >= width ? width : null);
+  }, { wrap: true, width, gap, justify: "center" });
 }
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls = "text", id?: string): void {
@@ -102,7 +89,6 @@ export function drawScreens(): void {
   const L = layoutNow();
   hud(L);
   panel(L);
-  toastBox(L);
   if (app.focusNext) {
     const age = frame().frame - app.openedFrame;
     if (age >= 1 && primaryPointer() !== "coarse") ui.setFocus(app.focusNext);
@@ -281,12 +267,6 @@ function measureRail(items: [string, string, boolean][], w: number, k: number): 
     }
   });
   return h;
-}
-function toastBox(L: Layout): void {
-  if (!app.toast) return;
-  const w = Math.min(L.lw * 0.92, 520);
-  ui.place("sh-toast", { anchor: "bottom", y: 16 }, () =>
-    ui.column("sh-toast-col", () => para(app.toast!.text(), w - 32, "toast-text", "sh-toast-text"), { style: "toast", align: "center" }));
 }
 
 // ------------------------------------------------------------------ panels (index.html #overlay-root)

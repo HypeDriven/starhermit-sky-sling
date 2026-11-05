@@ -4,14 +4,11 @@
 // hashes and replays), the content (content.js: the 45 Journey stages, the
 // lessons, the Daily, the themes), the session (session.js: mode
 // orchestration, undo, achievements, progression), the progress document and
-// the game's options (progress.js), the string tables (locales/*.js through
-// i18n.js) and the account strings (sh-strings.js).
+// and the game's options (progress.js).
 import { loadClassic } from "starhermit:script";
 
 for (const f of [
   "rules.js", "content.js", "session.js", "progress.js",
-  "locales/en-GB.js", "locales/es.js", "locales/de.js", "locales/fr.js", "locales/pt.js", "locales/it.js",
-  "i18n.js", "sh-strings.js",
 ]) loadClassic(f);
 
 // -- The shapes this client reads -------------------------------------------------
@@ -83,26 +80,12 @@ interface ProgressApi {
   same(a: unknown, b: unknown): boolean; readForeign(text: string | null): Progress | null;
   pickOption(key: string, v: unknown): boolean | undefined;
 }
-interface I18nApi {
-  LOCALES: string[];
-  T(key: string, vars?: Record<string, string | number> | null): string;
-  setLocale(tag: string): void;
-  getLang(): string;
-}
-export interface AccountStrings {
-  signIn: string; invite: string; copied: string; copyFailed: string; signedOut: string;
-  lbPosting: string; lbRank: string; lbPosted: string; lbNotPosted: string;
-}
-
 const SS = (globalThis as unknown as {
   SkySling: {
-    rules: RulesApi; content: ContentApi; session: SessionApi; progress: ProgressApi; i18n: I18nApi;
-    shStrings: { strings(lang: string): AccountStrings };
+    rules: RulesApi; content: ContentApi; session: SessionApi; progress: ProgressApi;
   };
 }).SkySling;
 export const Rules = SS.rules;
 export const Content = SS.content;
 export const SessionMod = SS.session;
 export const Prog = SS.progress;
-export const I18n = SS.i18n;
-export const ShStrings = SS.shStrings;

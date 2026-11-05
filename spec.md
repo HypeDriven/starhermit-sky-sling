@@ -68,7 +68,7 @@ Sky Sling is a StarHermit engine **script game** (TypeScript on host API 1.37), 
 
 - `rules.js`, `content.js`, `session.js` — the pure rules (fixed 1/120 s physics steps, two per 1/60 s tick, quantized launch velocities, support collapse, scoring, hashes, replay envelopes), the 45 Journey stages, the lessons, the Daily and the five themes, and the session (modes, practice undo, achievements, progression). They are classic scripts the engine loads with `loadClassic` (`native/classic.ts`) and the Node tests and `server.js` require unchanged. The session's Daily takes the day from the platform clock (`startRound('daily', date)`).
 - `progress.js` — the progress document (the browser build's `{ v, sum, stars, bestScores, achievements, counters, dailyExcluded }`, checksummed), its normalization, the two-device merge (the same result as `session.adoptProgress`), reading the browser build's cloud slot, and the game's own options.
-- `i18n.js`, `locales/*.js`, `sh-strings.js` — the string tables (US English as the key; es-ES and fr-CA list their differences) and the account strings.
+- `assets/strings.json` — the string tables on the engine's strings (US English as the key); the account lines are the engine's `starhermit.*`.
 - `native/main.ts` (entry: actions, rounds, launches, aim input, session events, results, lifecycle), `native/screens.ts` (every screen on `starhermit:ui`), `native/render.ts` (the island on `starhermit:scene`), `native/quality.ts` (the look per graphics level), `native/audio.ts`, `native/platform.ts` (save, options, player, clock, leaderboard), `native/i18n.ts`, `native/style.ts`.
 - `tools/ui-style.css` → `assets/ui-style.json` (`npm run css`, `starhermit css`), the class-based rewrite of the old `style.css`.
 - `score-script.js` — the platform script (`server=`), unchanged: it range-checks a finished run's total and posts it to the `high-score` board. `server.js` is the local dev server (static files plus the old replay-validating `/api/v1` routes); it is left out of the package.
@@ -101,18 +101,18 @@ The game's Settings panel keeps its own options — **Left-handed controls** and
 
 render.ts is the old render.js on `starhermit:scene`: the authored camera (fov 42, dollying back until the play area fits the playfield), the hemisphere fill, the key light with shadows and the warm rim light (r185 intensities ÷ π), the vertex-coloured sky dome with the additive sun sprite and merged cloud clusters, the sea with its ripple normal map, shallows and foam ring, the island, palms and rocks, the slingshot, bird, blocks and Bumbles with the procedural wood, stone, ice, sand and grass canvases, the dotted arc, and the seeded sparks, debris and puffs; ACES tone mapping. The sky reflections (the browser build's PMREM of its sky scene) are an equirectangular float image of the theme's dome and sun prefiltered with `fromEquirectangular`, at environment intensity 0.55. The runtime's quality tier picks the old preset and its budget (native/quality.ts, gfx.js's tables; sparks scale within a tier by the level, at most 2×):
 
-| Tier | Shadows | AO | Bloom / grade | Antialias | Reflections | Detail / motion | Materials | Textures | Clouds | Sparks |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Low | off | off | off | MSAA | off | plain, still | Lambert | — | 3 | 10 |
-| Balanced | 1024 | off | on | FXAA | on | detailed, animated | Standard | 256 px | 6 | 16 |
-| High | 2048 | on (half res) | on | SMAA | on | detailed, animated | Physical | 256 px | 8 | 20 |
-| Ultra | 4096 | high (full res) | on | MSAA | on | detailed, animated | Physical | 512 px | 10 | 28 |
+| Tier | Effects | Reflections | Detail / motion | Materials | Textures | Clouds | Sparks |
+|---|---|---|---|---|---|---|---|---|
+| Low | the level's (`levelSettings()`) | off | plain, still | Lambert | — | 3 | 10 |
+| Balanced | the level's (`levelSettings()`) | on | detailed, animated | Standard | 256 px | 6 | 16 |
+| High | the level's (`levelSettings()`) | on | detailed, animated | Physical | 256 px | 8 | 20 |
+| Ultra | the level's (`levelSettings()`) | on | detailed, animated | Physical | 512 px | 10 | 28 |
 
 Bloom is UnrealBloom's 0.25 / 0.3 / 0.92 before the tone mapping; the grade is the old GradeShader in display space (S-curve, saturation 1.1, cool shadows / warm highlights, 0.2 vignette). The runtime owns Auto, render scale, the pixel-ratio cap, adaptive resolution and the frame-rate limit and readout; the old per-effect overrides are not offered.
 
 ### Sound
 
-native/audio.ts plays the authored clips (`sfx/manifest.json`: one or two per event, the variant from audio.js's seeded stream) on the effects bus and the menu clicks on the interface bus, with their text captions in the hint line (aiming, whoosh, impact, target down, stage clear, out of shots, not allowed). The island pad (triangle blips every 0.9 s) and the sea wind (82 / 83.7 Hz sines with a slow swell) are rendered once into loops and played on the music bus from the first press (the runtime has no ambience bus; the wind's swell is 0.1 Hz so its 10 s loop joins). The runtime's Options own the volumes, mute and the voice limit.
+native/audio.ts plays the authored clips (`sfx/manifest.json`: one or two per event, a SoundBank picking the variant) on the effects bus and the menu clicks on the interface bus, with their text captions in the hint line (aiming, whoosh, impact, target down, stage clear, out of shots, not allowed). The island pad (triangle blips every 0.9 s) and the sea wind (82 / 83.7 Hz sines with a slow swell) are rendered natively into loops (OfflineAudioContext) and played on the music bus from the first press (the runtime has no ambience bus; the wind's swell is 0.1 Hz so its 10 s loop joins). The runtime's Options own the volumes, mute and the voice limit.
 
 ### Time and determinism
 

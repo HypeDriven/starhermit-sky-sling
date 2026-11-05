@@ -17,7 +17,7 @@
 // counted ticks from wall time between frames), so a paused game, a hidden
 // window and slow frames never change a shot and play scripts replay exactly.
 import "./classic.ts";
-import { clipboard, frame, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
+import { afterRender, levelSettings, clipboard, frame, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
 import { isDown, onAction, onPointerButton, onPointerMove, onTouch, vibrate } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn } from "starhermit:platform";
@@ -48,7 +48,6 @@ export const app = {
   lb: null as platform.Posted | "posting" | null,
   /** Signed in: the board's top ten for the results (undefined: loading, null: none). */
   board: undefined as platform.Row[] | null | undefined,
-  toast: null as { text: () => string; until: number } | null,
 };
 const now = (): number => frame().time;
 export const fresh = (): boolean => frame().frame !== app.openedFrame;
@@ -57,7 +56,10 @@ export const fresh = (): boolean => frame().frame !== app.openedFrame;
 let pendingAnnounce: string[] = [];
 /** The live region (#live): at most one announcement a frame, flushed in onRender. */
 export function announce(text: string): void { const t = text.trim(); if (t) pendingAnnounce.push(t); }
-export function toast(text: () => string): void { app.toast = { text, until: now() + 3.2 }; announce(text()); }
+export function toast(text: () => string): void {
+  ui.clearToasts!();
+  ui.toast!(text(), { duration: 3.2, style: ["toast", "toast-text"], dismissible: false });
+}
 export function setHint(key: string, vars: Vars | null = null): void { app.hint = { key, vars }; }
 /** audio.js play(name) with its caption cue in the hint line (no audio-only gameplay). */
 export function sfx(kind: audio.Sfx): void {
@@ -355,10 +357,9 @@ onFixedUpdate(() => {
 let lookKey = "";
 function applyLook(): void {
   const f = frame();
-  const k = `${f.quality}:${f.levelIndex}`;
-  if (k === lookKey) return;
-  lookKey = k;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  if (f.level === lookKey) return;
+  lookKey = f.level;
+  render.applyLook(lookFor(levelSettings(f.level)));
 }
 
 onStart(() => {
@@ -392,15 +393,12 @@ onUpdate((dt) => {
   applyLook();
   applyPalette(ui.preferences().highContrast);
   audio.update();
-  if (app.toast && app.toast.until < now()) app.toast = null;
 });
-const pending: (() => void)[] = [];
 /** A widget's press, run once the frame's UI is built (state changes mid-build would break later widgets). */
-export function later(fn: () => void): void { pending.push(fn); }
+export function later(fn: () => void): void { afterRender(fn); }
 onRender(() => {
   hudRects.length = 0;
   drawScreens();
-  for (const fn of pending.splice(0)) fn();
   pointerInput();
   if (session.state) render.sync(session.state);
   const f = frame();
