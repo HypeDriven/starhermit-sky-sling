@@ -44,3 +44,7 @@ engine.gamepad.pause=Start
 engine.gamepad.skip=RightShoulder
 engine.gamepad.undo=West
 engine.gamepad.restart=Select
+
+# Game language (saved per player); Automatic follows the account/device.
+control.localization=F2 | Language
+engine.group.localization=Interface

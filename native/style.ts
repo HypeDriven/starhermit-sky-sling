@@ -1,3 +1,5 @@
+// localization-runtime:attached
+import { setLocalizedDefaultFont as __l10nSetFont, setLocalizedStyles as __l10nStyles } from "./l10n/font.ts";
 // The look of the HUD, menus and panels: the browser build's style.css,
 // rewritten class-based in tools/ui-style.css and converted once with
 // `starhermit css` into assets/ui-style.json (`npm run css`), registered at
@@ -21,14 +23,14 @@ export function initStyles(): void {
   const css = files.readJson("assets/ui-style.json") as unknown as ui.CssStyles;
   base = { ...(css.tokens as Tokens) };
   current = { ...base };
-  ui.setFont({ family: "sans-serif" });
+  __l10nSetFont({ family: "sans-serif" });
   ui.setTheme({
     fontSize: 16, smallSize: 13.6, headingSize: 24, padding: 8, spacing: 10, radius: 10,
     text: "#eef4f8", muted: "#9fb2c0", panel: "#121c26", control: "#24384a", hovered: "#31506a",
     pressed: "#1b2a38", field: "#24384a", accent: "#ff8c5a", focus: "#ffd166", outline: "#9fb2c0",
   });
   ui.setTokens(css.tokens);
-  ui.setStyles({
+  __l10nStyles({
     ...css.styles,
     label: { text: { color: "$panel-fg" } },
     paragraph: { text: { color: "$panel-fg" } },

@@ -1,3 +1,4 @@
+import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // Sky Sling on the StarHermit engine: the entry module (starhermit.txt
 // engine.entry), played natively by the StarHermit client and in browsers by
 // the engine's web runtime. The rules (rules.js), the content (content.js)
@@ -396,7 +397,7 @@ onUpdate((dt) => {
 });
 /** A widget's press, run once the frame's UI is built (state changes mid-build would break later widgets). */
 export function later(fn: () => void): void { afterRender(fn); }
-onRender(() => {
+onRender(__l10nRender(() => {
   hudRects.length = 0;
   drawScreens();
   pointerInput();
@@ -407,4 +408,8 @@ onRender(() => {
     try { ui.announce(pendingAnnounce.join(" ").slice(0, 500)); } catch { /* next frame */ }
     pendingAnnounce = [];
   }
-});
+}));
+
+// localization-runtime:menu
+import { installLanguageMenu as __installLanguageMenu } from "./l10n/menu.ts";
+__installLanguageMenu(false);

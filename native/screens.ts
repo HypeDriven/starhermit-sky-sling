@@ -1,3 +1,7 @@
+import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
+import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
+// localization-runtime:attached
+import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
 // The browser build's DOM shell (index.html + ui.js) as starhermit:ui, built
 // every frame over the island: the top bar (☰ menu, the title, the mode, the
 // player's name and the cloud-save line, ? help), the Goal / Targets / Hint
@@ -11,7 +15,20 @@
 // and portrait phones (≤ 640 px wide: the bars on panels, the island between
 // them and the two rails side by side under it). Left-handed controls swap
 // the rails. The island fills the playfield rectangle left (main.ts view).
-import { frame, openMenu } from "starhermit:engine";
+// The browser build's DOM shell (index.html + ui.js) as starhermit:ui, built
+// every frame over the island: the top bar (☰ menu, the title, the mode, the
+// player's name and the cloud-save line, ? help), the Goal / Targets / Hint
+// rail and the Score / Shots left / Best rail, the bottom bar (❚❚ Pause, the
+// hint and caption line, ⏩ fast-forward, ↩ undo in Practice, ↻ restart),
+// the toast, and the panels — title, mode list, the stage grid, how to play,
+// pause, settings and results. The old media queries are layouts picked by
+// the window's logical size: wide (≥ 1024 px: the rails under the top bar),
+// compact (the rails at the bottom corners, without the hint), landscape
+// phones (≤ 500 px tall: compact rails under the top bar, tighter panels)
+// and portrait phones (≤ 640 px wide: the bars on panels, the island between
+// them and the two rails side by side under it). Left-handed controls swap
+// the rails. The island fills the playfield rectangle left (main.ts view).
+import { frame } from "starhermit:engine";
 import { bindings, primaryPointer, requestRebind } from "starhermit:input";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
@@ -42,12 +59,12 @@ function button(b: Btn, width: number | null = null): void {
   const s: ui.Style = width != null ? { width } : {};
   const weight = style === "btn-primary" ? "700" : "400";
   if (b.name && b.name !== b.text) {
-    opts.content = () => { ui.style({ text: { weight } }).label(b.text); };
+    opts.content = () => { ui.style(__l10nStyle({ text: { weight } })).label(b.text); };
   } else if (width != null && buttonWidth(b.text, style) > width) {
     const inner = Math.max(20, width - 36);
-    opts.content = () => { ui.style({ text: { align: "center", weight } }).paragraph(b.text, inner); };
+    opts.content = () => { ui.style(__l10nStyle({ text: { align: "center", weight } })).paragraph(b.text, inner); };
   }
-  if (ui.style(style, s).id(b.id).button(b.name ?? b.text, opts) && fresh() && !b.disabled) later(b.act);
+  if (ui.style(__l10nStyle(style), __l10nStyle(s)).id(b.id).button(b.name ?? b.text, opts) && fresh() && !b.disabled) later(b.act);
 }
 /** Buttons at their own widths in centred rows that wrap at `width` (.panel .row: flex-wrap, gap 10). */
 function flow(label: string, list: Btn[], width: number, gap = 10): void {
@@ -58,7 +75,7 @@ function flow(label: string, list: Btn[], width: number, gap = 10): void {
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls = "text", id?: string): void {
   if (!text) return;
-  let u = ui.style(cls);
+  let u = ui.style(__l10nStyle(cls));
   if (id) u = u.id(id);
   if (textWidth(text, cls) <= width) u.label(text);
   else u.paragraph(text, Math.max(20, width));
@@ -125,7 +142,7 @@ function hud(L: Layout): void {
   const left = ui.place("top-left", { anchor: "top-start", x: 0, y: 0 }, () => {
     ui.row("top-left-row", () => {
       button({ id: "btn-menu", text: "☰", name: T("Open menu"), act: actions.pause, disabled: !live || !inRound() });
-      ui.style("hud-title").id("hud-title").label("Sky Sling");
+      ui.style(__l10nStyle("hud-title")).id("hud-title").label("Sky Sling");
     }, { spacing: 8, align: "center", padding: { top: phone ? 6 : 8, bottom: phone ? 6 : 8, start: 12, end: 0 } });
   });
   rect(left);
@@ -204,12 +221,12 @@ function hud(L: Layout): void {
     ui.column(id, () => {
       items.forEach(([h, v, big], i) => {
         if (i && !compact) divider(`${id}-d${i}`, w);
-        ui.style("rail-h", { text: { size: 15.2 * k } }).label(h);
+        ui.style(__l10nStyle("rail-h"), __l10nStyle({ text: { size: 15.2 * k } })).label(h);
         if (v) {
           const cls = big ? "rail-big" : railCls;
           const st: ui.Style = { text: { size: (big ? 25.6 : 16) * k, align } };
-          if (textWidth(v, cls) * k <= w) ui.style(cls, st).id(`${id}-v${i}`).label(v);
-          else ui.style(cls, st).id(`${id}-v${i}`).paragraph(v, w);
+          if (textWidth(v, cls) * k <= w) ui.style(__l10nStyle(cls), __l10nStyle(st)).id(`${id}-v${i}`).label(v);
+          else ui.style(__l10nStyle(cls), __l10nStyle(st)).id(`${id}-v${i}`).paragraph(v, w);
         }
       });
     }, { width: w, spacing: 2, align });
@@ -360,7 +377,7 @@ function modesPanel(w: number): void {
       const opts: ui.ButtonOptions = {
         content: () => ui.column(`mode-${m.id}-face`, () => { para(T(m.title), tw, "mode-strong"); para(T(m.desc), tw, "mode-small"); }, { width: tw, spacing: 2 }),
       };
-      if (ui.style("mode-btn", { width: w }).id(`mode-${m.id}`).button(T(m.title), opts) && fresh()) later(m.act);
+      if (ui.style(__l10nStyle("mode-btn"), __l10nStyle({ width: w })).id(`mode-${m.id}`).button(T(m.title), opts) && fresh()) later(m.act);
     }
   }, { width: w, spacing: 8 });
 }
@@ -385,12 +402,12 @@ function stagesPanel(w: number): void {
           const locked = idx > unlocked;
           const opts: ui.ButtonOptions = {
             content: () => ui.column(`stage-${idx + 1}-face`, () => {
-              ui.style("level-num").label(String(idx + 1));
-              ui.style("level-stars").label("★".repeat(s) + "☆".repeat(Math.max(0, 3 - s)));
+              ui.style(__l10nStyle("level-num")).label(String(idx + 1));
+              ui.style(__l10nStyle("level-stars")).label("★".repeat(s) + "☆".repeat(Math.max(0, 3 - s)));
             }, { width: cw - 12, spacing: 0, align: "center" }),
           };
           if (locked) opts.disabled = true;
-          if (ui.style("level-btn", { width: cw }).id(`stage-${idx + 1}`).button(name, opts) && fresh() && !locked) later(() => startRound(mode, idx));
+          if (ui.style(__l10nStyle("level-btn"), __l10nStyle({ width: cw })).id(`stage-${idx + 1}`).button(name, opts) && fresh() && !locked) later(() => startRound(mode, idx));
         }
       }, { spacing: 8 });
     }
@@ -455,7 +472,7 @@ function toggle(id: string, label: string, on: boolean, w: number, set: (v: bool
         const s = st.scale, box = 22 * s, bx = r.x + (r.width - box) / 2, by = r.y + (r.height - box) / 2;
         draw.roundRect(bx, by, box, box, 4, on ? token("accent") : token("btn-bg"));
         draw.strokeRoundRect(bx, by, box, box, 4, token("dim"), 1);
-        if (on) draw.text("✓", bx + box / 2, by + 1 * s, { size: 17 * s, color: "#1a1005", align: "center", weight: "bold" });
+        if (on) draw.text("✓", bx + box / 2, by + 1 * s, __l10nDrawOptions({ size: 17 * s, color: "#1a1005", align: "center", weight: "bold" }));
       },
     });
     if (res.activated && fresh()) later(() => set(!on));
@@ -466,12 +483,12 @@ function settingsPanel(w: number): void {
   heading("panel-h2", T("Settings"), w, "settings-h");
   para(T("Sound, graphics, language, larger text, high contrast, reduced motion and vibration are in the StarHermit Options."), w, "dim", "options-note");
   flow("settings-runtime", [
-    { id: "btn-options", text: T("Open Options"), act: () => openMenu() },
+    { id: "btn-options", text: T("Open Options"), act: () => __l10nOptions() },
     { id: "btn-rebind", text: T("Key bindings"), act: () => requestRebind() },
   ], w);
   const o = platform.options;
   ui.column("fs-a11y", () => {
-    ui.style("legend").label(T("Accessibility"));
+    ui.style(__l10nStyle("legend")).label(T("Accessibility"));
     toggle("opt-lefty", N("Left-handed controls"), o.leftHanded, w - 28, (v) => platform.setOption("leftHanded", v));
     toggle("opt-assist", N("Timing assist (longer aim window)"), o.timingAssist, w - 28, (v) => platform.setOption("timingAssist", v));
   }, { style: "fieldset", width: w, spacing: 4 });
@@ -481,22 +498,22 @@ function resultsPanel(w: number, L: Layout): void {
   if (!r) return;
   const res = r.result;
   heading("panel-h2", res.won ? T("Stage Clear!") : T("Out of Shots"), w, "res-title");
-  ui.style("res-score").id("res-score").label(T("{n} points", { n: res.score.total }));
+  ui.style(__l10nStyle("res-score")).id("res-score").label(T("{n} points", { n: res.score.total }));
   const c2 = 90, c1 = Math.min(w - c2, Math.max(...[N("Targets"), N("Blocks"), N("Unused-shot bonus")].map((k) => textWidth(T(k), "cell"))) + 24);
   ui.column("res-breakdown", () => {
     ([[N("Targets"), res.score.targets], [N("Blocks"), res.score.blocks], [N("Unused-shot bonus"), res.score.shotsBonus]] as [string, number][]).forEach(([label, v], i) =>
       ui.row(`res-row-${i}`, () => {
         ui.column(`res-row-${i}-a`, () => para(T(label), c1 - 12, "cell"), { width: c1 });
-        ui.column(`res-row-${i}-b`, () => ui.style("cell-num").label(String(v)), { width: c2, align: "end" });
+        ui.column(`res-row-${i}-b`, () => ui.style(__l10nStyle("cell-num")).label(String(v)), { width: c2, align: "end" });
       }, { width: c1 + c2 }));
   }, { width: c1 + c2, spacing: L.short ? 0 : 3 });
-  if (res.won && r.stars != null) ui.style("res-stars").id("res-stars").label("★".repeat(r.stars) + "☆".repeat(3 - r.stars));
+  if (res.won && r.stars != null) ui.style(__l10nStyle("res-stars")).id("res-stars").label("★".repeat(r.stars) + "☆".repeat(3 - r.stars));
   if (app.achievement) para(T("Achievement unlocked: {name}", { name: T(app.achievement) }), w, "accent", "res-achievement");
   if (r.note) para(T(r.note), w, "dim", "res-ranked");
   const lb = leaderboardLine();
   if (lb) para(lb, w, "dim", "res-lb");
   if (app.board && app.board.length) {
-    ui.style("board-h").label(T("Leaderboard (top {n})", { n: app.board.length }));
+    ui.style(__l10nStyle("board-h")).label(T("Leaderboard (top {n})", { n: app.board.length }));
     const me = platform.displayName();
     for (const e of app.board) para(`${e.rank}. ${e.name || T("Player")} — ${e.score}`, w, e.name && e.name === me ? "board-me" : "dim");
   }
