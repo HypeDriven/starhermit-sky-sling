@@ -1,0 +1,103 @@
+{
+  "game": {
+    "id": "0ad99cf0-e011-4041-8685-3f22691dc553",
+    "displayName": "Sky Sling",
+    "hosting": {
+      "hostingEnabled": true,
+      "hostedUrl": "https://0ad99cf0-e011-4041-8685-3f22691dc553.starhermit.com/index.html",
+      "deployStatus": "live",
+      "pinnedCommitSha": null,
+      "deployedCommitSha": null,
+      "deployError": null,
+      "deployedAt": "2026-11-12T08:17:49.012246+00:00",
+      "externalLaunchUrl": null,
+      "engineVersion": "1.38.0",
+      "deployWarning": null
+    }
+  },
+  "publishedAt": "2026-11-12T08:17:53.784Z",
+  "sourceCommit": "0219a14b21d29013128ed2cb2c9cb940ba310d3d",
+  "bytesReceived": 1313172,
+  "archiveSha256": "060896691bf969236fc13e7927e00ab8766b460490685857dd653900d57d04dd",
+  "indexSha256": "60082ba9f1fae81a6e7f44f08acb3fa85303a380be81ac41935e51190f837cc0",
+  "result": {
+    "clientPublished": true,
+    "serverImageLoaded": false,
+    "imageDigest": null,
+    "bytesReceived": 1313172,
+    "mode": "replace",
+    "filesRemoved": 0,
+    "engineVersion": "1.38.0",
+    "deployWarning": null
+  },
+  "liveVerification": {
+    "at": "2026-11-12T08:17:53.784Z",
+    "files": [
+      {
+        "file": "starhermit-files.json",
+        "sha256": "60082ba9f1fae81a6e7f44f08acb3fa85303a380be81ac41935e51190f837cc0",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Hebrew.ttf",
+        "sha256": "c7de55890bebe740dd0d0a5e30b6d414c609b26cbf7f6e067802439ea1698390",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Japanese.otf",
+        "sha256": "46c2ddfa9a729ab766b1c70e11bc88e20aaf6b35be2a8078c9b73588e70a281c",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Khmer.ttf",
+        "sha256": "b5137a3150d11445601007e2392b512ac8197f2d68edbcf28cb75efdc1cdea3f",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/SimplifiedChinese.otf",
+        "sha256": "987430514fba69bde28cb0c32c9282067c915b2171e07aabcb1915d5b7c0eb6c",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Tamil.ttf",
+        "sha256": "6b44e8315e31894263700493e85ee33a44882334c168234e7d79fa5ba02a80fa",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/TraditionalChinese.otf",
+        "sha256": "cfe8b9ee68bab75d4702f8966c8c97ec7433033efd7b048b600b0340240b5a1e",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/common.json",
+        "sha256": "8ed9cef52b40ba8d9701099c97057879821aa20aa66717bb2972f27a788ca265",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/fonts.json",
+        "sha256": "37beaea0dba54c9f2c45995cbf9fd19fad21719d701718c41d7e58dd7748ca13",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/locales.json",
+        "sha256": "52ae79df9ddd711ea212ae4a5b9739aba2441f567f1f1a34855486d32dea827f",
+        "status": 200
+      },
+      {
+        "file": "assets/strings.json",
+        "sha256": "b556defdbde5f1e3e3cf551d09aabf9575b1d5f31d7db24ad5e21dd03d96cecc",
+        "status": 200
+      },
+      {
+        "file": "index.html",
+        "sha256": "20f0249e42d795ca4214bcc92f47d161f7b58e8a43656a37fa53c1fcd91300d0",
+        "status": 200
+      },
+      {
+        "file": "starhermit.txt",
+        "sha256": "c5b0e0d4570a7c763909724fe6435f6140ba5277c3101a7af397ca2bae9b5537",
+        "status": 200
+      }
+    ]
+  }
+}
