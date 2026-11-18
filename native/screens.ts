@@ -102,7 +102,7 @@ export function keysFor(action: string): string {
 }
 
 // ------------------------------------------------------------------ the frame
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L = layoutNow();
   hud(L);
   panel(L);
@@ -523,3 +523,10 @@ function resultsPanel(w: number, L: Layout): void {
   button({ id: "btn-menu-title", text: T("Menu"), act: actions.quitTitle });
 }
 void SessionMod;
+
+export function drawScreens(): void {
+  if (!(app.overlay === "help")) { drawScreensImmediate(); return; }
+  const actions = ["aim_left","aim_right","aim_up","aim_down","launch","pause","skip","restart","undo"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
+}

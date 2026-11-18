@@ -30,13 +30,9 @@
 // phones, where the canvas sat between the top bar and the rails), framed
 // with setViewOffset. Rendering never touches the rules state.
 import {
-  ACESFilmicToneMapping, AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, CanvasTexture, CircleGeometry, Color,
-  ConeGeometry, CylinderGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, DoubleSide, EquirectangularReflectionMapping,
-  FloatType, Fog, Group, HemisphereLight, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial,
-  MeshStandardMaterial, NoColorSpace, PerspectiveCamera, PlaneGeometry, PMREMGenerator, Quaternion, RepeatWrapping, RGBAFormat,
-  RoundedBoxGeometry, SphereGeometry, ParticleEmitter, Sprite, SpriteMaterial, SRGBColorSpace, TorusGeometry, type OrthographicCamera, Vector2, Vector3, mergeGeometries,
-  renderer, scene, type BufferGeometry, type Material, type Object3D, type Texture,
+  ACESFilmicToneMapping, AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, CanvasTexture, CircleGeometry, Color, ConeGeometry, CylinderGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, DoubleSide, EquirectangularReflectionMapping, FloatType, Fog, Group, HemisphereLight, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, NoColorSpace, PerspectiveCamera, PlaneGeometry, PMREMGenerator, PointsMaterial, Quaternion, RepeatWrapping, RGBAFormat, RoundedBoxGeometry, SphereGeometry, Sprite, SpriteMaterial, SRGBColorSpace, TorusGeometry, type OrthographicCamera, Vector2, Vector3, mergeGeometries, renderer, scene, type BufferGeometry, type Material, type Object3D, type Texture,
 } from "starhermit:scene";
+import { GPUParticleEmitter } from "starhermit:particles";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
 import { Content, Rules, type Level, type Mat, type State, type Theme } from "./classic.ts";
 import type { Look } from "./quality.ts";
@@ -834,15 +830,15 @@ export function sync(state: State): void {
   state.targets.forEach((t, j) => { const g = targetMeshes[j]; if (g) g.visible = t.alive; });
 }
 /** The sparks of an impact kind at one size (a native emitter; one color and life each). */
-const sparkEmitters = new Map<string, ParticleEmitter>();
-function sparkEmitter(k: "impact" | "block" | "pop", size: number): ParticleEmitter {
+const sparkEmitters = new Map<string, GPUParticleEmitter>();
+function sparkEmitter(k: "impact" | "block" | "pop", size: number): GPUParticleEmitter {
   const key = `${k}:${size}`;
   let e = sparkEmitters.get(key);
   if (!e) {
-    sharedFx ??= { spark: new SphereGeometry(1, 6, 4), chunk: new BoxGeometry(1, 1, 1), puff: new SphereGeometry(1, 12, 8) };
-    e = new ParticleEmitter({
-      capacity: 256, seed: sparkEmitters.size + 1, geometry: sharedFx.spark, size,
-      material: new MeshBasicMaterial({ transparent: true, depthWrite: false }),
+    sharedFx ??= { chunk: new BoxGeometry(1, 1, 1), puff: new SphereGeometry(1, 12, 8) };
+    e = new GPUParticleEmitter({
+      capacity: 256, seed: sparkEmitters.size + 1, size,
+      material: new PointsMaterial({ size: size * 2, transparent: true, depthWrite: false }),
       color: k === "pop" ? new Color(0.9, 1.6, 0.6) : new Color(1.6, 1.45, 1.1),
       life: k === "impact" ? 0.6 : 0.9, opacity: [1, 0],
       velocity: [0, 2.75, 0], velocitySpread: [3.5, 2.75, 0], gravity: [0, -Rules.GRAVITY * 0.6, 0],
@@ -858,7 +854,7 @@ export function spawnImpact(x: number, y: number, big: boolean, m: Mat | null = 
   if (!look || reducedMotion) return;
   const high = look.particles === "high";
   const k = kind ?? (big ? "block" : "impact");
-  sharedFx ??= { spark: new SphereGeometry(1, 6, 4), chunk: new BoxGeometry(1, 1, 1), puff: new SphereGeometry(1, 12, 8) };
+  sharedFx ??= { chunk: new BoxGeometry(1, 1, 1), puff: new SphereGeometry(1, 12, 8) };
   const group = new Group();
   const parts: Mesh[] = [], mats: Effect["mats"] = [];
   const rnd = Rules.mulberry32(((x * 131 + y * 57) | 0) >>> 0); // seeded cosmetic variants
@@ -889,7 +885,7 @@ export function spawnImpact(x: number, y: number, big: boolean, m: Mat | null = 
   scene.add(group);
   effects.push({ group, parts, mats, age: 0, life: 0.9 });
 }
-let sharedFx: { spark: BufferGeometry; chunk: BufferGeometry; puff: BufferGeometry } | null = null;
+let sharedFx: { chunk: BufferGeometry; puff: BufferGeometry } | null = null;
 
 // ---------------------------------------------------------------- camera and per frame
 export interface ViewRect { x: number; y: number; width: number; height: number }
