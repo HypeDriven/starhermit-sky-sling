@@ -426,6 +426,7 @@ export function applyLook(next: Look): void {
     vignette: { amount: 0.2, inner: 0.4, outer: 0.9 },
   } : null;
   renderer.antialias = next.antialias;
+  renderer.motionBlur = next.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   renderer.shadowMap.enabled = next.shadows > 0;
   key.castShadow = next.shadows > 0;
   if (next.shadows > 0) key.shadow.mapSize = next.shadows;

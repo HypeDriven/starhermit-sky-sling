@@ -4,7 +4,7 @@
 // as a signed-out offscreen run (--render-check) that drives the real UI.
 // Also checks that the committed web index (starhermit-files.json) matches
 // the files, i.e. that `npm run package` ran after the last change. STARHERMIT
-// names the runtime (default: the published 1.44.1 Linux runtime under
+// names the runtime (default: the published 1.47.0 Linux runtime under
 // ~/sh/runtime); TSC the TypeScript compiler (default ~/sh/runtime/ts).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const fallback = join(homedir(), 'sh/runtime/1.44.1/starhermit-1.44.1-linux-x86_64/starhermit');
+const fallback = join(homedir(), 'sh/runtime/1.47.0/starhermit-1.47.0-linux-x86_64/starhermit');
 const exe = process.env.STARHERMIT || (existsSync(fallback) ? fallback : null);
 const tsc = process.env.TSC || join(homedir(), 'sh/runtime/ts/node_modules/.bin/tsc');
 let failed = 0;
@@ -41,7 +41,7 @@ if (!exe) {
   process.exit(failed ? 1 : 0);
 }
 try {
-  const out = execFileSync(exe, ['check', '.', '--quiet'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const out = execFileSync(exe, ['check', '.', '--quiet', '--no-motion-blur'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const warnings = out.split('\n').filter((l) => /^warning/i.test(l));
   if (warnings.length) fail('starhermit check', warnings.join('\n'));
   else console.log('ok - starhermit check');
@@ -57,7 +57,7 @@ scripts.push([`daily ${today}`, join(tmp, 'daily.play')]);
 const shots = process.env.SKYSLING_SHOTS; // optional: where the scripts' `save` frames go
 for (const [name, path] of scripts) {
   try {
-    execFileSync(exe, ['.', '--render-check', '--guest', '--script', path], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: shots ? { ...process.env, STARHERMIT_RENDER_CHECK_PNG: shots } : process.env });
+    execFileSync(exe, ['.', '--render-check', '--no-motion-blur', '--guest', '--script', path], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: shots ? { ...process.env, STARHERMIT_RENDER_CHECK_PNG: shots } : process.env });
     console.log(`ok - ${name}`);
   } catch (e) { fail(name, e); }
 }
