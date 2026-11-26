@@ -62,7 +62,7 @@ Every transition has one owner and an explicit reason. Backgrounding pauses solo
 
 ## 3. Implementation on the StarHermit engine
 
-Sky Sling is a StarHermit engine **script game** (TypeScript on host API 1.50), pinned in `starhermit.txt` to the published engine 1.50.0 with `engine.minor=50` (three.js r185 parity) and the capabilities `platform`, `storage` and `clipboard`. The same package plays natively in the StarHermit client and in browsers through the engine's web runtime: `launch=index.html` is the loader `npm run package` writes (with `starhermit-files.json`, the file index), so both are regenerated after every change.
+Sky Sling is a StarHermit engine **script game** (TypeScript on host API 1.51), pinned in `starhermit.txt` to the published engine 1.51.0 with `engine.minor=51` (three.js r185 parity) and the capabilities `platform`, `storage` and `clipboard`. The same package plays natively in the StarHermit client and in browsers through the engine's web runtime: `launch=index.html` is the loader `npm run package` writes (with `starhermit-files.json`, the file index), so both are regenerated after every change.
 
 ### Files
 
@@ -201,9 +201,9 @@ The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-S
 
 Cosmetic particle emitters use native GPU particles with automatic CPU fallback on devices or graphics tiers without GPU particle support.
 
-## Engine 1.50.0
+## Engine 1.51.0
 
-Browser play uses the StarHermit 1.50.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+Browser play uses the StarHermit 1.51.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
 
 The help screen replays through retained native UI while its contents, options, layout and key bindings are unchanged.
 
