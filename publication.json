@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:01:07.390481+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-26T22:24:08.335067+00:00",
+    "coverArtUpdatedAt": "2026-11-27T17:07:39.868638+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-26T22:24:08.325553+00:00",
+      "deployedAt": "2026-11-27T17:07:39.858412+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.51.0",
+      "engineVersion": "1.53.0",
       "deployWarning": null
     },
     "description": "Launch characters with a slingshot, topple structures, and complete each challenge with limited shots.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-26T22:24:08.722Z",
-  "sourceCommit": "f96028c6ffc9cd25f603e6976d7389378b670093",
-  "bytesReceived": 1342170,
-  "archiveSha256": "0f3f4fcc95c8382a2c93881f0527482494d26eee1637ef60a0a25945ed9ec3b1",
+  "publishedAt": "2026-11-27T17:07:40.037Z",
+  "sourceCommit": "f8dc580c790b0bf5aba0f73dc50b96c1b4f7252d",
+  "bytesReceived": 1342174,
+  "archiveSha256": "5c1e254196a88e70dfc72b32389eaf3756dd4872a3780120ea6be5134277b8ee",
   "indexSha256": "5857077d1d814f4001a6df4bb5df66f012a2c4701a5000756cd2ca99e4661afd",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 1342170,
+    "bytesReceived": 1342174,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.51.0",
+    "engineVersion": "1.53.0",
     "deployWarning": null
   },
   "liveVerification": {
