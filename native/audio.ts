@@ -37,9 +37,6 @@ export function loadSfx(): void {
       if (ok.length) banks.set(event, new SoundBank({ clips: ok, bus: event === "ui" ? "interface" : "effects" }));
     });
   }
-  const failed = (e: unknown): void => { console.warn(`audio render: ${String(e)}`); };
-  renderMusic().then((c) => { musicClip = c; }, failed);
-  renderWind().then((c) => { windClip = c; }, failed);
 }
 
 /** audio.js play(name): one of the event's clips. */
@@ -90,7 +87,19 @@ let musicVoice: Sound | null = null, windVoice: Sound | null = null;
 const WIND_GAIN = 0.5 / 0.6;
 
 /** Each frame: the loops, once the mixer runs. */
+let __bedsStarted = false;
+function startBeds(): void {
+  if (__bedsStarted) return;
+  __bedsStarted = true;
+  void (async () => {
+    const failed = (e: unknown): void => { console.warn(`audio render: ${String(e)}`); };
+    renderMusic().then((c) => { musicClip = c; }, failed);
+    renderWind().then((c) => { windClip = c; }, failed);
+  })();
+}
+
 export function update(): void {
+  startBeds();
   if (context.state !== "running") return;
   if (musicClip && !musicVoice) {
     try { musicVoice = playClip(musicClip, { bus: "music", loop: true }); } catch { musicVoice = null; }
